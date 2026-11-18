@@ -145,12 +145,12 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: 22.x
-            - uses: actions/download-artifact@v4
+            - uses: actions/download-artifact@v8
               with:
                   path: dist/
                   pattern: binaries-*
                   merge-multiple: true
-            - uses: actions/download-artifact@v4
+            - uses: actions/download-artifact@v8
               with:
                   name: declarations
             - run: pnpm install --frozen-lockfile
@@ -191,7 +191,7 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: 22.x
-            - uses: actions/download-artifact@v4
+            - uses: actions/download-artifact@v8
               with:
                   name: npm-package
             - shell: bash
@@ -213,7 +213,7 @@ jobs:
             - id: release
               uses: googleapis/release-please-action@v4
             - if: steps.release.outputs.sha == github.sha
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v8
               with:
                   name: npm-package
             - if: steps.release.outputs.sha == github.sha
