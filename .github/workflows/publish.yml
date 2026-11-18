@@ -171,7 +171,7 @@ jobs:
                   mkdir "$RUNNER_TEMP/consumer"
                   cd "$RUNNER_TEMP/consumer"
                   echo '{"private":true}' > package.json
-                  pnpm add --offline "$RUNNER_TEMP"/*.tgz
+                  pnpm add "$RUNNER_TEMP"/*.tgz
                   cp "$GITHUB_WORKSPACE/test/typescript/index.ts" .
                   "$GITHUB_WORKSPACE/node_modules/.bin/tsc" --strict --noEmit index.ts
             - uses: actions/upload-artifact@v4
