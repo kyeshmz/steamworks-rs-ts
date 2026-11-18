@@ -45,7 +45,7 @@ jobs:
               uses: pnpm/action-setup@v4
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v7
               with:
                   node-version: 22.x
 
@@ -87,7 +87,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - uses: pnpm/action-setup@v4
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v7
               with:
                   node-version: 22.x
             - uses: dtolnay/rust-toolchain@stable
@@ -108,7 +108,7 @@ jobs:
             - uses: pnpm/action-setup@v4
 
             - name: Setup Node
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v7
               with:
                   node-version: 22.x
 
@@ -142,7 +142,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - uses: pnpm/action-setup@v4
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v7
               with:
                   node-version: 22.x
             - uses: actions/download-artifact@v4
@@ -188,7 +188,7 @@ jobs:
         runs-on: ${{ matrix.os }}
         steps:
             - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v7
               with:
                   node-version: 22.x
             - uses: actions/download-artifact@v4
@@ -233,7 +233,7 @@ jobs:
             contents: read
             id-token: write
         steps:
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v7
               with:
                   node-version: 24.x
                   registry-url: https://registry.npmjs.org
