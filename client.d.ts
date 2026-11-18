@@ -2,6 +2,8 @@
 
 export declare function init(appId?: number | undefined | null): void
 
+export declare function isInitialized(): boolean
+
 export interface PlayerSteamId {
   steamId64: bigint
   steamId32: string

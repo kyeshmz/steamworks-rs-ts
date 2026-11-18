@@ -14,6 +14,11 @@ pub fn init(app_id: Option<u32>) -> Result<(), Error> {
 }
 
 #[napi]
+pub fn is_initialized() -> bool {
+    client::is_initialized()
+}
+
+#[napi]
 pub fn restart_app_if_necessary(app_id: u32) -> bool {
     steamworks::restart_app_if_necessary(AppId(app_id))
 }

@@ -15,7 +15,9 @@ if (!isMainThread) {
 }
 
 async function run() {
+    assert.equal(steam.isInitialized(), false)
     assert.throws(() => steam.init(480), /fixture first init failure/)
+    assert.equal(steam.isInitialized(), false)
     const gate = new Int32Array(new SharedArrayBuffer(4))
     const workers = Array.from({ length: 3 }, () => new Worker(__filename, { workerData: gate }))
     const wait = (worker, expected) => new Promise((resolve, reject) => {
@@ -27,6 +29,7 @@ async function run() {
     Atomics.store(gate, 0, 1)
     Atomics.notify(gate, 0)
     await initialized
+    assert.equal(steam.isInitialized(), true)
     const { inventory, auth, callback, cloud, voice, runtime, friends } = steam.init()
     assert.deepEqual(friends.getFriendsGroups(), [{ id: -2, name: 'Party' }, { id: 8, name: 'Empty' }])
     assert.deepEqual(friends.getFriendsGroupMembersList(-2), [76561197960265729n])
@@ -67,6 +70,22 @@ async function run() {
     assert.throws(() => auth.beginAuthSession(peer, Buffer.alloc(0)), /nonempty ticket/)
     assert.throws(() => auth.beginAuthSession(peer, Buffer.from('bad')), /invalid ticket/)
     const events = []
+    const deliveries = [
+        ['GameOverlayActivated', [{ active: true, userInitiated: true, appId: 480 }, { active: false, userInitiated: false, appId: 480 }]],
+        ['GameLobbyJoinRequested', [{ lobby_steam_id: peer + 4n, friend_steam_id: peer }]],
+        ['MicroTxnAuthorizationResponse', [{ app_id: 480, order_id: (1n << 64n) - 10n, authorized: true }]],
+    ].map(([name, expected]) => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`missing ${name}`)), 3000)
+        const seen = []
+        const handle = callback.register(steam.SteamCallback[name], event => {
+            seen.push(event)
+            if (seen.length === expected.length) {
+                clearTimeout(timer)
+                handle.disconnect()
+                try { assert.deepEqual(seen, expected); resolve() } catch (error) { reject(error) }
+            }
+        })
+    }))
     let listener
     await new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('missing auth validation')), 3000)
@@ -80,6 +99,7 @@ async function run() {
     assert.ok(runtime.pumpStats(true).runs > 0)
     auth.endAuthSession(peer)
     listener.disconnect()
+    await Promise.all(deliveries)
     const itemId = (1n << 64n) - 2n
     const item = { itemId, definition: 8, quantity: 2, flags: 1 }
     const props = { itemId, definition: 8, quantity: 2, properties: { name: 'Token', quantity: '65538' } }

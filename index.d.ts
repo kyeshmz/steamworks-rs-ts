@@ -1,3 +1,4 @@
+export declare var isInitialized: () => boolean;
 export declare var init: (appId?: number) => Omit<Client, 'init' | 'runCallbacks' | 'restartAppIfNecessary' | 'game_server'>;
 export declare var restartAppIfNecessary: (appId: number) => boolean;
 export declare var electronEnableSteamOverlay: (disableEachFrameInvalidation?: boolean) => void;

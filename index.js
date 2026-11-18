@@ -18,6 +18,9 @@ if (platform === 'win32' && arch === 'x64') {
 
 let runCallbacksInterval = undefined
 
+/** Whether this process has successfully initialized the Steam client. */
+module.exports.isInitialized = () => nativeBinding.isInitialized()
+
 /**
  * Initialize the steam client or throw an error if it fails
  * @param {number} [appId] - App ID of the game to load, if undefined, will search for a steam_appid.txt file

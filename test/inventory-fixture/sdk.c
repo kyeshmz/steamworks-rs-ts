@@ -22,6 +22,8 @@ int SteamAPI_GetHSteamPipe(void) { return 1; }
 void SteamAPI_ManualDispatch_RunFrame(int pipe) {}
 #pragma pack(push, 4)
 struct validation { uint64_t peer; uint32_t response; uint64_t owner; };
+struct overlay_activation { uint8_t active; bool user_initiated; uint32_t app_id, pid; };
+struct order_event { uint32_t app; uint64_t order; uint8_t authorized; };
 struct callback_msg { int user, id; void *data; int size; };
 #pragma pack(pop)
 static const uint64_t peer = 76561197960265729ULL;
@@ -76,10 +78,24 @@ void SteamAPI_ISteamUser_EndAuthSession(void *p, uint64_t id) {
     ++ended;
 }
 bool SteamAPI_ManualDispatch_GetNextCallback(int pipe, struct callback_msg *msg) {
-    if (!auth_thread || !active || delivered == 2) return false;
+    if (!auth_thread || !active || delivered == 6) return false;
     assert(freed == delivered);
-    validation = (struct validation){peer, delivered ? 10 : 0, peer + 1};
-    *msg = (struct callback_msg){1, 143, &validation, sizeof(validation)};
+    static struct overlay_activation overlay;
+    static uint64_t join[2];
+    static struct order_event order;
+    if (delivered < 2) {
+        overlay = (struct overlay_activation){delivered ? 0 : 2, !delivered, 480, 123};
+        *msg = (struct callback_msg){1, 331, &overlay, sizeof(overlay)};
+    } else if (delivered == 2) {
+        join[0] = peer + 4; join[1] = peer;
+        *msg = (struct callback_msg){1, 333, join, sizeof(join)};
+    } else if (delivered == 3) {
+        order = (struct order_event){480, UINT64_MAX - 9, 1};
+        *msg = (struct callback_msg){1, 152, &order, sizeof(order)};
+    } else {
+        validation = (struct validation){peer, delivered == 5 ? 10 : 0, peer + 1};
+        *msg = (struct callback_msg){1, 143, &validation, sizeof(validation)};
+    }
     ++delivered;
     return true;
 }
@@ -227,7 +243,7 @@ __attribute__((destructor)) static void verify_cleanup(void) {
         exchanges += kind[i] == 2;
     }
     assert(consumes == 3 && exchanges == 4);
-    assert(accepted == 1 && rejected == 1 && ended == 1 && freed == 2 && !active);
+    assert(accepted == 1 && rejected == 1 && ended == 1 && freed == 6 && !active);
     fputs("auth fixture: rejected submission, accepted submission, OK then identity failure, session ended\n", stderr);
     fputs("inventory fixture: 1 failed init, 1 successful init, 2 refused and 2 unserializable mutations, 16 results destroyed\n", stderr);
 }

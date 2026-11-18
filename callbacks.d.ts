@@ -101,5 +101,7 @@ export interface CallbackReturns {
     }
     [client.callback.SteamCallback.GameOverlayActivated]: {
         active: boolean
+        userInitiated: boolean
+        appId: number
     }
 }

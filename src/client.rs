@@ -11,6 +11,10 @@ pub fn get_client() -> Client {
     option.unwrap()
 }
 
+pub fn is_initialized() -> bool {
+    STEAM_CLIENT.lock().unwrap().is_some()
+}
+
 pub fn init(app_id: Option<u32>) -> Result<()> {
     let mut slot = STEAM_CLIENT.lock().unwrap();
     if let Some(client) = slot.as_ref() {

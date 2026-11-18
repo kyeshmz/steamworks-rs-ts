@@ -2,6 +2,27 @@ use napi_derive::napi;
 use steamworks::sys;
 
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OverlayActivation {
+    active: bool,
+    user_initiated: bool,
+    app_id: u32,
+}
+
+unsafe impl steamworks::Callback for OverlayActivation {
+    const ID: i32 = sys::GameOverlayActivated_t_k_iCallback as i32;
+    const SIZE: i32 = std::mem::size_of::<sys::GameOverlayActivated_t>() as i32;
+    unsafe fn from_raw(raw: *mut std::ffi::c_void) -> Self {
+        let event = raw.cast::<sys::GameOverlayActivated_t>().read_unaligned();
+        Self {
+            active: event.m_bActive != 0,
+            user_initiated: event.m_bUserInitiated,
+            app_id: event.m_nAppID,
+        }
+    }
+}
+
+#[derive(serde::Serialize)]
 struct PresenceJoin {
     friend_steam_id: u64,
     connect: String,
@@ -158,7 +179,7 @@ pub mod callback {
                 register_callback::<steamworks::MicroTxnAuthorizationResponse>(threadsafe_handler)
             }
             SteamCallback::GameOverlayActivated => {
-                register_callback::<steamworks::GameOverlayActivated>(threadsafe_handler)
+                register_callback::<super::OverlayActivation>(threadsafe_handler)
             }
             SteamCallback::LobbyChatMsg => {
                 register_callback::<steamworks::LobbyChatMsg>(threadsafe_handler)
