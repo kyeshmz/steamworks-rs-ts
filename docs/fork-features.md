@@ -5,19 +5,22 @@ Use `const client = require('@kyeshmz/steamworks.ts').init(appId)` in the main p
 | Area | What applications can do |
 |---|---|
 | Leaderboards | Find or create a board, upload scores and details, download ranked entries, and read board metadata. |
-| Friends | Enumerate immediate friends, request persona information, and read small, medium, or large RGBA avatars. |
-| Input | Find action origins and controller glyphs, change action-set layers, open the binding panel, and trigger vibration and haptics. |
-| Lobbies | Filter by strings, numbers, slots or distance, read and set member data, and exchange chat buffers. |
-| Networking | Use channel-based [Steam Networking Messages](networking-messages.md). Legacy P2P remains available. Connection-oriented Networking Sockets is a different API and is not implemented. |
+| Friends | Enumerate friends, read avatars and game/lobby activity, request cached rich presence, send game invites, and handle join notifications. |
+| Input | Find action origins and glyphs, change action-set layers, read motion data, set the lightbar, open the binding panel, and trigger vibration and haptics. |
+| Lobbies | Filter by strings, numbers, slots or distance, exchange chat buffers, invite members, and change ownership, type or member limit. |
+| Networking | Use channel-based [Steam Networking Messages](networking-messages.md), connection-oriented [Steam Networking Sockets](networking-sockets.md), or legacy P2P with explicit channels. These transports are not interchangeable. |
 | Achievements and stats | Fetch global unlock percentages, localized attributes and icons, and get or set float stats. |
-| Cloud and Workshop | Read or write binary saves asynchronously, inspect cloud timestamps and persistence, and select the Workshop file type on creation. |
-| Overlay and screenshots | Query overlay availability, subscribe to activation changes, place notifications, trigger captures and import JPEGs. |
+| Cloud and Workshop | Read or write binary saves asynchronously, query quota, select per-file sync platforms, and read or update [Workshop metadata, tags and collection children](workshop.md). |
+| Overlay and screenshots | Detect Big Picture and overlay availability, place notifications, hook capture requests, submit RGB pixels, import JPEGs with thumbnails, and receive completion events. |
 | Apps and DLC | Read launch parameters, list DLC, request installation or removal, and check download progress. |
-| Inventory | Load definition IDs and properties, and send a playtime heartbeat. Owned item balances, trading, purchases and signed proofs are not exposed. |
+| Voice | [Capture compressed audio on request and decode received chunks to PCM](voice.md). The application controls recording, networking and playback. |
+| Inventory | [Read owned item IDs, quantities, flags, timestamps and instance properties](inventory-reads.md); load definitions and send a playtime heartbeat. Trading, purchases and signed proofs are not exposed. |
+
+`init()` reuses the process's first successful Steam client. Calling it again with a different App ID throws. Start a separate process to use another App ID. This keeps asynchronous inventory reads and their native result handles attached to the session that created them.
 
 ## What the checks prove
 
-`test/package-smoke.js` loads the built addon and checks native argument validation without a Steam account. `test/typescript` compiles a consumer against the declarations. The release workflow runs package checks on Linux x64, Windows x64, and both Mac architectures.
+`test/package-smoke.js` loads the built addon and checks native argument validation without a Steam account. `test/typescript` compiles a consumer against the declarations. `node test/networking-sockets.js` tests invalid socket handles, message sizes, ports and peer IDs without opening a connection. The release workflow is configured for Linux x64, Windows x64, and both Mac architectures. GitHub Actions is disabled on this repository.
 
 Use `node test/steam-readonly.js 480` with a signed-in Steam client to check reads. `test/inventory-definitions.js` needs an App ID and a known item definition. Overlay rendering, physical input, two-account networking and writes to Steam need separate live tests.
 

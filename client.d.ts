@@ -11,6 +11,7 @@ export declare namespace achievement {
   export function isActivated(achievement: string): boolean
   export function clear(achievement: string): boolean
   export function names(): Array<string>
+  export function count(): number
   /** Use "name", "desc", or "hidden". The hidden flag is "0" or "1". */
   export function getDisplayAttribute(achievement: string, key: string): string | null
   /** Returns a 64x64 RGBA buffer, or null if the icon is unavailable. */
@@ -82,7 +83,11 @@ export declare namespace callback {
     GameLobbyJoinRequested = 8,
     MicroTxnAuthorizationResponse = 9,
     GameOverlayActivated = 10,
-    LobbyChatMsg = 11
+    LobbyChatMsg = 11,
+    GameRichPresenceJoinRequested = 12,
+    FriendRichPresenceUpdate = 13,
+    ScreenshotRequested = 14,
+    ScreenshotReady = 15
   }
   export function register<C extends keyof import('./callbacks').CallbackReturns>(steamCallback: C, handler: (value: import('./callbacks').CallbackReturns[C]) => void): Handle
   export class Handle {
@@ -90,6 +95,17 @@ export declare namespace callback {
   }
 }
 export declare namespace cloud {
+  export function getSyncPlatforms(name: string): number
+  /**
+   * Combine Windows (1), macOS (2), PS3 (4), Linux (8), Switch (16),
+   * Android (32) and iOS (64). Use 0 for none or 0xffffffff for all.
+   */
+  export function setSyncPlatforms(name: string, mask: number): boolean
+  export interface CloudQuota {
+    totalBytes: bigint
+    availableBytes: bigint
+  }
+  export function getQuota(): CloudQuota | null
   export function isEnabledForAccount(): boolean
   export function isEnabledForApp(): boolean
   export function setEnabledForApp(enabled: boolean): void
@@ -109,12 +125,30 @@ export declare namespace cloud {
   }
 }
 export declare namespace friends {
+  export function inviteUserToGame(steamId64: bigint, connect: string): boolean
+  /** Requests fresh presence. Steam delivers FriendRichPresenceUpdate when available. */
+  export function requestRichPresence(steamId64: bigint): void
+  /** Read a cached presence value. Missing keys return the empty string. */
+  export function getRichPresence(steamId64: bigint, key: string): string
+  export interface FriendGameInfo {
+    appId: number
+    lobbyId?: bigint
+  }
+  export function getGamePlayed(steamId64: bigint): FriendGameInfo | null
   export interface Persona {
     name: string
     state: string
     /** 64 x 64 RGBA bytes when Steam has an avatar available. */
     mediumAvatar?: Buffer
   }
+  export interface CoplayFriend {
+    steamId64: bigint
+    appId: number
+    lastPlayed: number
+  }
+  export function getCoplayFriends(): Array<CoplayFriend>
+  export function setPlayedWith(steamId64: bigint): void
+  export function getRichPresenceKeys(steamId64: bigint): Array<string>
   /** Returns the IDs of immediate friends, excluding pending invitations. */
   export function getFriends(): Array<bigint>
   export function getPersonaName(steamId64: bigint): string
@@ -157,6 +191,18 @@ export declare namespace input {
     PS5Controller = 'PS5Controller',
     SteamDeckController = 'SteamDeckController'
   }
+  export interface MotionData {
+    rotQuatX: number
+    rotQuatY: number
+    rotQuatZ: number
+    rotQuatW: number
+    posAccelX: number
+    posAccelY: number
+    posAccelZ: number
+    rotVelX: number
+    rotVelY: number
+    rotVelZ: number
+  }
   export interface AnalogActionVector {
     x: number
     y: number
@@ -179,6 +225,10 @@ export declare namespace input {
     getAnalogActionVector(actionHandle: bigint): AnalogActionVector
     getType(): InputType
     getHandle(): bigint
+    /** Read orientation, acceleration and angular velocity from a motion-capable controller. */
+    getMotionData(): MotionData
+    /** Set RGB on a supported controller, or restore the user's preferred color. */
+    setLightbarColor(red: number, green: number, blue: number, restoreDefaultLightbarColor?: boolean | undefined | null): void
     getDigitalActionOrigins(actionSet: bigint, action: bigint): Array<number>
     getAnalogActionOrigins(actionSet: bigint, action: bigint): Array<number>
     showBindingPanel(): boolean
@@ -194,6 +244,27 @@ export declare namespace input {
   }
 }
 export declare namespace inventory {
+  export interface InventoryItem {
+    itemId: bigint
+    definition: number
+    quantity: number
+    flags: number
+  }
+  export interface InventoryResult {
+    timestamp: number
+    items: Array<InventoryItem>
+  }
+  export interface ItemProperties {
+    itemId: bigint
+    definition: number
+    quantity: number
+    properties: Record<string, string>
+  }
+  export function getAllItems(): Promise<InventoryResult>
+  export function getItemsById(itemIds: Array<bigint>): Promise<InventoryResult>
+  export function getItemsByID(itemIds: Array<bigint>): Promise<InventoryResult>
+  export function getItemProperties(itemIds: Array<bigint>): Promise<Array<ItemProperties>>
+  export function getAllItemProperties(): Promise<Array<ItemProperties>>
   /** Requests a refresh. A successful request does not mean definitions are ready. */
   export function loadItemDefinitions(): boolean
   /** Returns the cached definition IDs, or null if Steam could not read them. */
@@ -323,6 +394,14 @@ export declare namespace matchmaking {
     getChatEntry(chatId: number): Buffer
     getMemberCount(): bigint
     getMemberLimit(): bigint | null
+    /** Owner only. Returns false if Steam refuses the new limit. */
+    setMemberLimit(limit: number): boolean
+    /** Transfer ownership to a current lobby member. Only the current owner can do this. */
+    setOwner(steamId64: bigint): boolean
+    /** Change the lobby's visibility as its owner. */
+    setType(lobbyType: LobbyType): boolean
+    /** Send a lobby invite without opening the overlay. Success does not mean the user joined. */
+    inviteUser(steamId64: bigint): boolean
     getMembers(): Array<PlayerSteamId>
     getOwner(): PlayerSteamId
     /** Set metadata for the local member, not for the lobby itself. */
@@ -374,8 +453,11 @@ export declare namespace networking {
     ReliableWithBuffering = 3
   }
   export function sendP2PPacket(steamId64: bigint, sendType: SendType, data: Buffer): boolean
+  export function sendP2PPacketOnChannel(steamId64: bigint, sendType: SendType, data: Buffer, channel: number): boolean
   export function isP2PPacketAvailable(): number
+  export function isP2PPacketAvailableOnChannel(channel: number): number
   export function readP2PPacket(size: number): P2PPacket
+  export function readP2PPacketFromChannel(size: number, channel: number): P2PPacket
   export function acceptP2PSession(steamId64: bigint): void
   export function closeP2PSession(steamId64: bigint): void
 }
@@ -406,8 +488,29 @@ export declare namespace networking_messages {
   export function acceptSessionWithUser(steamId64: bigint): boolean
   /** Close the peer's session on all channels. This does not block future requests. */
   export function closeSessionWithUser(steamId64: bigint): boolean
+  export function closeChannelWithUser(steamId64: bigint, channel: number): boolean
   /** Replaces the failure handler. Omit the handler to stop listening. */
   export function setSessionFailedHandler(handler?: (failure: SessionFailure) => void): void
+}
+export declare namespace networking_sockets {
+  export function createListenSocketP2P(virtualPort: number): number
+  export function connectP2P(steamId64: bigint, virtualPort: number): number
+  export interface ConnectionInfo {
+    connection: number
+    listenSocket: number
+    steamId64?: bigint
+    state: number
+    endReason: number
+  }
+  export function setConnectionStatusHandler(handler?: (info: ConnectionInfo) => void): void
+  export function connectionInfo(connection: number): ConnectionInfo | null
+  export function acceptConnection(connection: number): void
+  export function sendMessage(connection: number, data: Buffer, reliable?: boolean | undefined | null): bigint
+  export function receiveMessages(connection: number, maxMessages?: number | undefined | null): Array<Buffer>
+  export function closeConnection(connection: number, linger?: boolean | undefined | null): boolean
+  export function closeListenSocket(socket: number): boolean
+  export function initRelayNetworkAccess(): void
+  export function relayStatus(): string
 }
 export declare namespace overlay {
   export const enum NotificationPosition {
@@ -438,10 +541,17 @@ export declare namespace overlay {
   export function activateToStore(appId: number, flag: StoreFlag): void
 }
 export declare namespace screenshots {
+  /** Supply tightly packed RGB24 rows, without alpha or stride padding. */
+  export function writeScreenshot(data: Buffer, width: number, height: number): number
+  export function hookScreenshots(enabled: boolean): void
+  export function setLocation(screenshot: number, location: string): boolean
+  export function tagUser(screenshot: number, steamId64: bigint): boolean
+  export function tagPublishedFile(screenshot: number, fileId: bigint): boolean
+  export function isScreenshotsHooked(): boolean
   /** Asks the Steam overlay to capture the current frame. */
   export function triggerScreenshot(): void
   /** Imports a JPEG from disk. Pass null for thumbnailFilename to let Steam generate it. */
-  export function addScreenshotToLibrary(filename: string, thumbnailFilename: null, width: number, height: number): number
+  export function addScreenshotToLibrary(filename: string, thumbnailFilename: string | null, width: number, height: number): number
 }
 export declare namespace stats {
   export function getInt(name: string): number | null
@@ -453,6 +563,7 @@ export declare namespace stats {
   export function resetAll(achievementsToo: boolean): boolean
 }
 export declare namespace utils {
+  export function isSteamInBigPictureMode(): boolean
   export function isOverlayEnabled(): boolean
   export function uiLanguage(): string
   export function getAppId(): number
@@ -477,6 +588,13 @@ export declare namespace utils {
   /** @returns true if the floating keyboard was shown, otherwise, false */
   export function showFloatingGamepadTextInput(keyboardMode: FloatingGamepadTextInputMode, x: number, y: number, width: number, height: number): Promise<boolean>
 }
+export declare namespace voice {
+  export function startVoiceRecording(): void
+  export function stopVoiceRecording(): void
+  export function getVoice(): Buffer
+  export function decompressVoice(compressed: Buffer, sampleRate: number): Buffer
+  export function getVoiceOptimalSampleRate(): number
+}
 export declare namespace workshop {
   export interface UgcResult {
     itemId: bigint
@@ -488,6 +606,17 @@ export declare namespace workshop {
     Private = 2,
     Unlisted = 3
   }
+  export interface KeyValueTag {
+    key: string
+    value: string
+  }
+  export const enum ContentDescriptor {
+    NudityOrSexualContent = 0,
+    FrequentViolenceOrGore = 1,
+    AdultOnlySexualContent = 2,
+    GratuitousSexualContent = 3,
+    AnyMatureContent = 4
+  }
   export interface UgcUpdate {
     title?: string
     description?: string
@@ -496,6 +625,13 @@ export declare namespace workshop {
     contentPath?: string
     tags?: Array<string>
     visibility?: UgcItemVisibility
+    metadata?: string
+    keyValueTags?: Array<KeyValueTag>
+    removeKeyValueTags?: Array<string>
+    removeAllKeyValueTags?: boolean
+    allowAdminTags?: boolean
+    contentDescriptors?: Array<ContentDescriptor>
+    removeContentDescriptors?: Array<ContentDescriptor>
   }
   export interface InstallInfo {
     folder: string
@@ -688,6 +824,9 @@ export declare namespace workshop {
     numDownvotes: number
     numChildren: number
     previewUrl?: string
+    metadata?: string
+    keyValueTags?: Array<KeyValueTag>
+    children?: Array<bigint>
     statistics: WorkshopItemStatistic
   }
   export interface WorkshopPaginatedResult {
@@ -703,6 +842,11 @@ export declare namespace workshop {
   export interface WorkshopItemQueryConfig {
     cachedResponseMaxAge?: number
     includeMetadata?: boolean
+    returnChildren?: boolean
+    includeKeyValueTags?: boolean
+    requiredKeyValueTags?: Array<KeyValueTag>
+    /** Only supported by getUserItems. */
+    cloudFileNameFilter?: string
     includeLongDescription?: boolean
     includeAdditionalPreviews?: boolean
     onlyIds?: boolean

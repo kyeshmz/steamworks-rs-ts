@@ -1,4 +1,51 @@
 use napi_derive::napi;
+use steamworks::sys;
+
+#[derive(serde::Serialize)]
+struct PresenceJoin {
+    friend_steam_id: u64,
+    connect: String,
+}
+
+unsafe impl steamworks::Callback for PresenceJoin {
+    const ID: i32 = sys::GameRichPresenceJoinRequested_t_k_iCallback as i32;
+    const SIZE: i32 = std::mem::size_of::<sys::GameRichPresenceJoinRequested_t>() as i32;
+    unsafe fn from_raw(raw: *mut std::ffi::c_void) -> Self {
+        let event = raw
+            .cast::<sys::GameRichPresenceJoinRequested_t>()
+            .read_unaligned();
+        let bytes: Vec<u8> = event
+            .m_rgchConnect
+            .into_iter()
+            .take_while(|&b| b != 0)
+            .map(|b| b as u8)
+            .collect();
+        Self {
+            friend_steam_id: event.m_steamIDFriend.m_steamid.m_unAll64Bits,
+            connect: String::from_utf8_lossy(&bytes).into_owned(),
+        }
+    }
+}
+
+#[derive(serde::Serialize)]
+struct PresenceUpdate {
+    friend_steam_id: u64,
+    app_id: u32,
+}
+
+unsafe impl steamworks::Callback for PresenceUpdate {
+    const ID: i32 = sys::FriendRichPresenceUpdate_t_k_iCallback as i32;
+    const SIZE: i32 = std::mem::size_of::<sys::FriendRichPresenceUpdate_t>() as i32;
+    unsafe fn from_raw(raw: *mut std::ffi::c_void) -> Self {
+        let event = raw
+            .cast::<sys::FriendRichPresenceUpdate_t>()
+            .read_unaligned();
+        Self {
+            friend_steam_id: event.m_steamIDFriend.m_steamid.m_unAll64Bits,
+            app_id: event.m_nAppID,
+        }
+    }
+}
 
 #[napi]
 pub mod callback {
@@ -36,6 +83,10 @@ pub mod callback {
         MicroTxnAuthorizationResponse,
         GameOverlayActivated,
         LobbyChatMsg,
+        GameRichPresenceJoinRequested,
+        FriendRichPresenceUpdate,
+        ScreenshotRequested,
+        ScreenshotReady,
     }
 
     #[napi(ts_generic_types = "C extends keyof import('./callbacks').CallbackReturns")]
@@ -85,6 +136,29 @@ pub mod callback {
             SteamCallback::LobbyChatMsg => {
                 register_callback::<steamworks::LobbyChatMsg>(threadsafe_handler)
             }
+            SteamCallback::GameRichPresenceJoinRequested => {
+                register_callback::<super::PresenceJoin>(threadsafe_handler)
+            }
+            SteamCallback::FriendRichPresenceUpdate => {
+                register_callback::<super::PresenceUpdate>(threadsafe_handler)
+            }
+            SteamCallback::ScreenshotRequested => crate::client::get_client().register_callback(
+                move |_: steamworks::screenshots::ScreenshotRequested| {
+                    threadsafe_handler
+                        .call(serde_json::json!({}), ThreadsafeFunctionCallMode::Blocking);
+                },
+            ),
+            SteamCallback::ScreenshotReady => crate::client::get_client().register_callback(
+                move |event: steamworks::screenshots::ScreenshotReady| {
+                    let value = match event.local_handle {
+                        Ok(handle) => serde_json::json!({"handle": handle, "error": null}),
+                        Err(error) => {
+                            serde_json::json!({"handle": null, "error": error.to_string()})
+                        }
+                    };
+                    threadsafe_handler.call(value, ThreadsafeFunctionCallMode::Blocking);
+                },
+            ),
         };
 
         Handle {

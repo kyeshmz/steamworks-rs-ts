@@ -3,11 +3,11 @@ use napi_derive::napi;
 #[napi]
 pub mod workshop {
     use napi::bindgen_prelude::{BigInt, Error};
-    use steamworks::{AccountId, PublishedFileId};
+    use steamworks::AccountId;
     use tokio::sync::oneshot;
 
     use crate::api::localplayer::PlayerSteamId;
-    use crate::api::workshop::workshop::UgcItemVisibility;
+    use crate::api::workshop::workshop::{published_file_id, KeyValueTag, UgcItemVisibility};
 
     #[napi]
     pub enum UGCQueryType {
@@ -280,11 +280,18 @@ pub mod workshop {
         pub num_downvotes: u32,
         pub num_children: u32,
         pub preview_url: Option<String>,
+        pub metadata: Option<String>,
+        pub key_value_tags: Option<Vec<KeyValueTag>>,
+        pub children: Option<Vec<BigInt>>,
         pub statistics: WorkshopItemStatistic, // Is it necessary to design this as optional?
     }
 
     impl WorkshopItem {
-        fn from_query_results(results: &steamworks::QueryResults, index: u32) -> Option<Self> {
+        fn from_query_results(
+            results: &steamworks::QueryResults,
+            index: u32,
+            config: &WorkshopItemQueryConfig,
+        ) -> Option<Self> {
             results.get(index).map(|item| Self {
                 published_file_id: BigInt::from(item.published_file_id.0),
                 creator_app_id: item.creator_app_id.map(|id| id.0),
@@ -305,6 +312,30 @@ pub mod workshop {
                 num_downvotes: item.num_downvotes,
                 num_children: item.num_children,
                 preview_url: results.preview_url(index),
+                metadata: if config.include_metadata == Some(true) {
+                    results
+                        .get_metadata(index)
+                        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+                } else {
+                    None
+                },
+                key_value_tags: if config.include_key_value_tags == Some(true) {
+                    Some(
+                        (0..results.key_value_tags(index))
+                            .filter_map(|n| results.get_key_value_tag(index, n))
+                            .map(|(key, value)| KeyValueTag { key, value })
+                            .collect(),
+                    )
+                } else {
+                    None
+                },
+                children: if config.return_children == Some(true) {
+                    results
+                        .get_children(index)
+                        .map(|ids| ids.into_iter().map(|id| BigInt::from(id.0)).collect())
+                } else {
+                    None
+                },
                 statistics: WorkshopItemStatistic::from_query_results(results, index),
             })
         }
@@ -320,10 +351,13 @@ pub mod workshop {
     }
 
     impl WorkshopPaginatedResult {
-        fn from_query_results(query_results: steamworks::QueryResults) -> Self {
+        fn from_query_results(
+            query_results: steamworks::QueryResults,
+            config: &WorkshopItemQueryConfig,
+        ) -> Self {
             Self {
                 items: (0..query_results.returned_results())
-                    .map(|i| WorkshopItem::from_query_results(&query_results, i))
+                    .map(|i| WorkshopItem::from_query_results(&query_results, i, config))
                     .collect(),
                 returned_results: query_results.returned_results(),
                 total_results: query_results.total_results(),
@@ -340,21 +374,29 @@ pub mod workshop {
     }
 
     impl WorkshopItemsResult {
-        fn from_query_results(query_results: steamworks::QueryResults) -> Self {
+        fn from_query_results(
+            query_results: steamworks::QueryResults,
+            config: &WorkshopItemQueryConfig,
+        ) -> Self {
             Self {
                 items: (0..query_results.returned_results())
-                    .map(|i| WorkshopItem::from_query_results(&query_results, i))
+                    .map(|i| WorkshopItem::from_query_results(&query_results, i, config))
                     .collect(),
                 was_cached: query_results.was_cached(),
             }
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     #[napi(object)]
     pub struct WorkshopItemQueryConfig {
         pub cached_response_max_age: Option<u32>,
         pub include_metadata: Option<bool>,
+        pub return_children: Option<bool>,
+        pub include_key_value_tags: Option<bool>,
+        pub required_key_value_tags: Option<Vec<KeyValueTag>>,
+        /// Only supported by getUserItems.
+        pub cloud_file_name_filter: Option<String>,
         pub include_long_description: Option<bool>,
         pub include_additional_previews: Option<bool>,
         pub only_ids: Option<bool>,
@@ -367,6 +409,33 @@ pub mod workshop {
         pub ranked_by_trend_days: Option<u32>,
     }
 
+    impl WorkshopItemQueryConfig {
+        fn validate(&self, user_query: bool) -> Result<(), Error> {
+            if self.cloud_file_name_filter.is_some() && !user_query {
+                return Err(Error::from_reason(
+                    "cloudFileNameFilter requires getUserItems",
+                ));
+            }
+            for tag in self.required_key_value_tags.iter().flatten() {
+                tag.validate()?;
+            }
+            if self
+                .language
+                .iter()
+                .chain(&self.search_text)
+                .chain(&self.cloud_file_name_filter)
+                .chain(self.required_tags.iter().flatten())
+                .chain(self.excluded_tags.iter().flatten())
+                .any(|s| s.contains('\0'))
+            {
+                return Err(Error::from_reason(
+                    "Workshop query strings must not contain NUL",
+                ));
+            }
+            Ok(())
+        }
+    }
+
     #[derive(Debug)]
     #[napi(object)]
     pub struct AppIDs {
@@ -376,51 +445,59 @@ pub mod workshop {
 
     fn handle_query_config<Manager>(
         mut query_handle: steamworks::QueryHandle<Manager>,
-        query_config: Option<WorkshopItemQueryConfig>,
+        query_config: &WorkshopItemQueryConfig,
     ) -> steamworks::QueryHandle<Manager> {
-        // Apply statistics query parameters if provided
-        if let Some(query_config) = query_config {
-            if let Some(cached_response_max_age) = query_config.cached_response_max_age {
-                query_handle = query_handle.set_allow_cached_response(cached_response_max_age);
+        if let Some(children) = query_config.return_children {
+            query_handle = query_handle.set_return_children(children);
+        }
+        if let Some(tags) = query_config.include_key_value_tags {
+            query_handle = query_handle.set_return_key_value_tags(tags);
+        }
+        if let Some(name) = &query_config.cloud_file_name_filter {
+            query_handle = query_handle.set_cloud_file_name_filter(name);
+        }
+        for tag in query_config.required_key_value_tags.iter().flatten() {
+            query_handle = query_handle.add_required_key_value_tag(&tag.key, &tag.value);
+        }
+        if let Some(cached_response_max_age) = query_config.cached_response_max_age {
+            query_handle = query_handle.set_allow_cached_response(cached_response_max_age);
+        }
+        if let Some(include_metadata) = query_config.include_metadata {
+            query_handle = query_handle.set_return_metadata(include_metadata);
+        }
+        if let Some(include_long_description) = query_config.include_long_description {
+            query_handle = query_handle.set_return_long_description(include_long_description);
+        }
+        if let Some(include_additional_previews) = query_config.include_additional_previews {
+            query_handle = query_handle.set_return_additional_previews(include_additional_previews)
+        }
+        if let Some(only_ids) = query_config.only_ids {
+            query_handle = query_handle.set_return_only_ids(only_ids)
+        }
+        if let Some(only_total) = query_config.only_total {
+            query_handle = query_handle.set_return_total_only(only_total)
+        }
+        if let Some(language) = &query_config.language {
+            query_handle = query_handle.set_language(language);
+        }
+        if let Some(match_any_tag) = query_config.match_any_tag {
+            query_handle = query_handle.set_match_any_tag(match_any_tag);
+        }
+        if let Some(required_tags) = &query_config.required_tags {
+            for tag in required_tags {
+                query_handle = query_handle.add_required_tag(tag);
             }
-            if let Some(include_metadata) = query_config.include_metadata {
-                query_handle = query_handle.set_return_metadata(include_metadata);
+        }
+        if let Some(excluded_tags) = &query_config.excluded_tags {
+            for tag in excluded_tags {
+                query_handle = query_handle.add_excluded_tag(tag);
             }
-            if let Some(include_long_description) = query_config.include_long_description {
-                query_handle = query_handle.set_return_long_description(include_long_description);
-            }
-            if let Some(include_additional_previews) = query_config.include_additional_previews {
-                query_handle =
-                    query_handle.set_return_additional_previews(include_additional_previews)
-            }
-            if let Some(only_ids) = query_config.only_ids {
-                query_handle = query_handle.set_return_only_ids(only_ids)
-            }
-            if let Some(only_total) = query_config.only_total {
-                query_handle = query_handle.set_return_total_only(only_total)
-            }
-            if let Some(language) = query_config.language {
-                query_handle = query_handle.set_language(&language);
-            }
-            if let Some(match_any_tag) = query_config.match_any_tag {
-                query_handle = query_handle.set_match_any_tag(match_any_tag);
-            }
-            if let Some(required_tags) = query_config.required_tags {
-                for tag in required_tags {
-                    query_handle = query_handle.add_required_tag(&tag);
-                }
-            }
-            if let Some(excluded_tags) = query_config.excluded_tags {
-                for tag in excluded_tags {
-                    query_handle = query_handle.add_excluded_tag(&tag);
-                }
-            }
-            if let Some(search_text) = query_config.search_text {
-                query_handle = query_handle.set_search_text(&search_text);
-            }
-            if let Some(ranked_by_trend_days) = query_config.ranked_by_trend_days {
-                query_handle = query_handle.set_ranked_by_trend_days(ranked_by_trend_days);
-            }
+        }
+        if let Some(search_text) = &query_config.search_text {
+            query_handle = query_handle.set_search_text(search_text);
+        }
+        if let Some(ranked_by_trend_days) = query_config.ranked_by_trend_days {
+            query_handle = query_handle.set_ranked_by_trend_days(ranked_by_trend_days);
         }
         query_handle
     }
@@ -430,22 +507,24 @@ pub mod workshop {
         item: BigInt,
         query_config: Option<WorkshopItemQueryConfig>,
     ) -> Result<Option<WorkshopItem>, Error> {
+        let query_config = query_config.unwrap_or_default();
+        query_config.validate(false)?;
+        let item = published_file_id(&item)?;
         let client = crate::client::get_client();
         let (tx, rx) = oneshot::channel();
 
         {
             let mut query_handle = client
                 .ugc()
-                .query_item(PublishedFileId(item.get_u64().1))
+                .query_item(item)
                 .map_err(|e| Error::from_reason(e.to_string()))?;
 
-            query_handle = handle_query_config(query_handle, query_config);
+            query_handle = handle_query_config(query_handle, &query_config);
 
-            query_handle.fetch(|fetch_result| {
-                tx.send(
-                    fetch_result
-                        .map(|query_results| WorkshopItem::from_query_results(&query_results, 0)),
-                )
+            query_handle.fetch(move |fetch_result| {
+                tx.send(fetch_result.map(|query_results| {
+                    WorkshopItem::from_query_results(&query_results, 0, &query_config)
+                }))
                 .unwrap();
             });
         }
@@ -460,28 +539,27 @@ pub mod workshop {
         items: Vec<BigInt>,
         query_config: Option<WorkshopItemQueryConfig>,
     ) -> Result<WorkshopItemsResult, Error> {
+        let query_config = query_config.unwrap_or_default();
+        query_config.validate(false)?;
+        let items = items
+            .iter()
+            .map(published_file_id)
+            .collect::<Result<Vec<_>, _>>()?;
         let client = crate::client::get_client();
         let (tx, rx) = oneshot::channel();
 
         {
             let mut query_handle = client
                 .ugc()
-                .query_items(
-                    items
-                        .iter()
-                        .map(|id| PublishedFileId(id.get_u64().1))
-                        .collect(),
-                )
+                .query_items(items)
                 .map_err(|e| Error::from_reason(e.to_string()))?;
 
-            query_handle = handle_query_config(query_handle, query_config);
+            query_handle = handle_query_config(query_handle, &query_config);
 
-            query_handle.fetch(|fetch_result| {
-                tx.send(
-                    fetch_result.map(|query_results| {
-                        WorkshopItemsResult::from_query_results(query_results)
-                    }),
-                )
+            query_handle.fetch(move |fetch_result| {
+                tx.send(fetch_result.map(|query_results| {
+                    WorkshopItemsResult::from_query_results(query_results, &query_config)
+                }))
                 .unwrap();
             });
         }
@@ -500,6 +578,8 @@ pub mod workshop {
         consumer_app_id: u32,
         query_config: Option<WorkshopItemQueryConfig>,
     ) -> Result<WorkshopPaginatedResult, Error> {
+        let query_config = query_config.unwrap_or_default();
+        query_config.validate(false)?;
         let client = crate::client::get_client();
         let (tx, rx) = oneshot::channel();
 
@@ -518,11 +598,11 @@ pub mod workshop {
                 )
                 .map_err(|e| Error::from_reason(e.to_string()))?;
 
-            query_handle = handle_query_config(query_handle, query_config);
+            query_handle = handle_query_config(query_handle, &query_config);
 
-            query_handle.fetch(|fetch_result| {
+            query_handle.fetch(move |fetch_result| {
                 tx.send(fetch_result.map(|query_results| {
-                    WorkshopPaginatedResult::from_query_results(query_results)
+                    WorkshopPaginatedResult::from_query_results(query_results, &query_config)
                 }))
                 .unwrap();
             });
@@ -543,6 +623,8 @@ pub mod workshop {
         app_ids: AppIDs,
         query_config: Option<WorkshopItemQueryConfig>,
     ) -> Result<WorkshopPaginatedResult, Error> {
+        let query_config = query_config.unwrap_or_default();
+        query_config.validate(true)?;
         let client = crate::client::get_client();
         let (tx, rx) = oneshot::channel();
 
@@ -563,11 +645,11 @@ pub mod workshop {
                 )
                 .map_err(|e| Error::from_reason(e.to_string()))?;
 
-            query_handle = handle_query_config(query_handle, query_config);
+            query_handle = handle_query_config(query_handle, &query_config);
 
-            query_handle.fetch(|fetch_result| {
+            query_handle.fetch(move |fetch_result| {
                 tx.send(fetch_result.map(|query_results| {
-                    WorkshopPaginatedResult::from_query_results(query_results)
+                    WorkshopPaginatedResult::from_query_results(query_results, &query_config)
                 }))
                 .unwrap();
             });

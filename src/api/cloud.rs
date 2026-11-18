@@ -4,8 +4,74 @@ use napi_derive::napi;
 pub mod cloud {
     use napi::bindgen_prelude::{BigInt, Buffer, Error};
     use napi::Env;
+    use std::ffi::CString;
     use std::io::Read;
     use std::io::Write;
+    use steamworks::sys;
+
+    // The SDK uses ERemoteStoragePlatform as a bit mask. Combinations are not valid
+    // discriminants of the Rust enum in the pinned bindings. Use its u32 ABI.
+    extern "C" {
+        #[link_name = "SteamAPI_ISteamRemoteStorage_GetSyncPlatforms"]
+        fn get_platform_mask(
+            storage: *mut sys::ISteamRemoteStorage,
+            name: *const std::ffi::c_char,
+        ) -> u32;
+        #[link_name = "SteamAPI_ISteamRemoteStorage_SetSyncPlatforms"]
+        fn set_platform_mask(
+            storage: *mut sys::ISteamRemoteStorage,
+            name: *const std::ffi::c_char,
+            mask: u32,
+        ) -> bool;
+    }
+
+    fn with_storage<T>(f: impl FnOnce(*mut sys::ISteamRemoteStorage) -> T) -> Result<T, Error> {
+        let _client = crate::client::get_client();
+        let storage = unsafe { sys::SteamAPI_SteamRemoteStorage_v016() };
+        if storage.is_null() {
+            return Err(Error::from_reason("Steam Cloud is unavailable"));
+        }
+        Ok(f(storage))
+    }
+
+    #[napi]
+    pub fn get_sync_platforms(name: String) -> Result<u32, Error> {
+        check_name(&name)?;
+        let name = CString::new(name).map_err(|e| Error::from_reason(e.to_string()))?;
+        with_storage(|storage| unsafe { get_platform_mask(storage, name.as_ptr()) })
+    }
+
+    /// Combine Windows (1), macOS (2), PS3 (4), Linux (8), Switch (16),
+    /// Android (32) and iOS (64). Use 0 for none or 0xffffffff for all.
+    #[napi]
+    pub fn set_sync_platforms(name: String, mask: f64) -> Result<bool, Error> {
+        check_name(&name)?;
+        if mask.fract() != 0.0 || !((0.0..=127.0).contains(&mask) || mask == u32::MAX as f64) {
+            return Err(Error::from_reason("Invalid cloud platform mask"));
+        }
+        let name = CString::new(name).map_err(|e| Error::from_reason(e.to_string()))?;
+        with_storage(|storage| unsafe { set_platform_mask(storage, name.as_ptr(), mask as u32) })
+    }
+
+    #[napi(object)]
+    pub struct CloudQuota {
+        pub total_bytes: BigInt,
+        pub available_bytes: BigInt,
+    }
+
+    #[napi]
+    pub fn get_quota() -> Result<Option<CloudQuota>, Error> {
+        with_storage(|storage| {
+            let (mut total, mut available) = (0, 0);
+            unsafe {
+                sys::SteamAPI_ISteamRemoteStorage_GetQuota(storage, &mut total, &mut available)
+            }
+            .then(|| CloudQuota {
+                total_bytes: total.into(),
+                available_bytes: available.into(),
+            })
+        })
+    }
 
     #[napi]
     pub struct FileInfo {

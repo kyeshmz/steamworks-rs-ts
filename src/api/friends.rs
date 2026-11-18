@@ -4,7 +4,79 @@ use napi_derive::napi;
 #[napi]
 pub mod friends {
     use napi::bindgen_prelude::{BigInt, Buffer, Error};
-    use steamworks::{FriendFlags, FriendState, SteamId};
+    use std::ffi::{CStr, CString};
+    use steamworks::{sys, FriendFlags, FriendState, SteamId};
+
+    fn with_friends<T>(f: impl FnOnce(*mut sys::ISteamFriends) -> T) -> Result<T, Error> {
+        let _client = crate::client::get_client();
+        let friends = unsafe { sys::SteamAPI_SteamFriends_v017() };
+        if friends.is_null() {
+            return Err(Error::from_reason("Steam friends interface unavailable"));
+        }
+        Ok(f(friends))
+    }
+
+    #[napi]
+    pub fn invite_user_to_game(steam_id64: BigInt, connect: String) -> Result<bool, Error> {
+        let id = steam_id(steam_id64)?;
+        if connect.len() >= sys::k_cchMaxRichPresenceValueLength as usize {
+            return Err(Error::from_reason("Connect string exceeds 255 bytes"));
+        }
+        let connect =
+            CString::new(connect).map_err(|_| Error::from_reason("Connect string contains NUL"))?;
+        with_friends(|f| unsafe {
+            sys::SteamAPI_ISteamFriends_InviteUserToGame(f, id.raw(), connect.as_ptr())
+        })
+    }
+
+    /// Requests fresh presence. Steam delivers FriendRichPresenceUpdate when available.
+    #[napi]
+    pub fn request_rich_presence(steam_id64: BigInt) -> Result<(), Error> {
+        let id = steam_id(steam_id64)?;
+        with_friends(|f| unsafe {
+            sys::SteamAPI_ISteamFriends_RequestFriendRichPresence(f, id.raw())
+        })
+    }
+
+    /// Read a cached presence value. Missing keys return the empty string.
+    #[napi]
+    pub fn get_rich_presence(steam_id64: BigInt, key: String) -> Result<String, Error> {
+        let id = steam_id(steam_id64)?;
+        if key.is_empty() || key.len() >= sys::k_cchMaxRichPresenceKeyLength as usize {
+            return Err(Error::from_reason(
+                "Rich presence keys must contain 1 to 63 bytes",
+            ));
+        }
+        let key =
+            CString::new(key).map_err(|_| Error::from_reason("Rich presence key contains NUL"))?;
+        with_friends(|f| unsafe {
+            let ptr = sys::SteamAPI_ISteamFriends_GetFriendRichPresence(f, id.raw(), key.as_ptr());
+            if ptr.is_null() {
+                String::new()
+            } else {
+                CStr::from_ptr(ptr).to_string_lossy().into_owned()
+            }
+        })
+    }
+
+    #[napi(object)]
+    pub struct FriendGameInfo {
+        pub app_id: u32,
+        pub lobby_id: Option<BigInt>,
+    }
+
+    #[napi]
+    pub fn get_game_played(steam_id64: BigInt) -> Result<Option<FriendGameInfo>, Error> {
+        let id = steam_id(steam_id64)?;
+        Ok(crate::client::get_client()
+            .friends()
+            .get_friend(id)
+            .game_played()
+            .map(|game| FriendGameInfo {
+                app_id: game.game.app_id().0,
+                lobby_id: (game.lobby.raw() != 0).then(|| game.lobby.raw().into()),
+            }))
+    }
 
     #[napi(object)]
     pub struct Persona {
@@ -21,6 +93,54 @@ pub mod friends {
                 "Expected a nonzero unsigned 64-bit Steam ID",
             )),
         }
+    }
+
+    #[napi(object)]
+    pub struct CoplayFriend {
+        pub steam_id64: BigInt,
+        pub app_id: u32,
+        pub last_played: i32,
+    }
+
+    #[napi]
+    pub fn get_coplay_friends() -> Vec<CoplayFriend> {
+        crate::client::get_client()
+            .friends()
+            .get_coplay_friends()
+            .into_iter()
+            .map(|friend| CoplayFriend {
+                steam_id64: friend.id().raw().into(),
+                app_id: friend.coplay_game_played().0,
+                last_played: friend.coplay_time(),
+            })
+            .collect()
+    }
+
+    #[napi]
+    pub fn set_played_with(steam_id64: BigInt) -> Result<(), Error> {
+        let id = steam_id(steam_id64)?;
+        crate::client::get_client()
+            .friends()
+            .get_friend(id)
+            .set_played_with();
+        Ok(())
+    }
+
+    #[napi]
+    pub fn get_rich_presence_keys(steam_id64: BigInt) -> Result<Vec<String>, Error> {
+        let id = steam_id(steam_id64)?;
+        with_friends(|f| unsafe {
+            (0..sys::SteamAPI_ISteamFriends_GetFriendRichPresenceKeyCount(f, id.raw()))
+                .filter_map(|index| {
+                    let key = sys::SteamAPI_ISteamFriends_GetFriendRichPresenceKeyByIndex(
+                        f,
+                        id.raw(),
+                        index,
+                    );
+                    (!key.is_null()).then(|| CStr::from_ptr(key).to_string_lossy().into_owned())
+                })
+                .collect()
+        })
     }
 
     /// Returns the IDs of immediate friends, excluding pending invitations.

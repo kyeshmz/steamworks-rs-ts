@@ -1,5 +1,7 @@
 # Peer messages
 
+`closeChannelWithUser(peerId, channel)` closes a single channel without closing the peer's other channels. `closeSessionWithUser(peerId)` closes the entire session.
+
 `client.networking_messages` wraps `ISteamNetworkingMessages`. It is separate from `client.networking`, which uses the legacy P2P transport. Both peers must use the same transport and App ID.
 
 After matching players, obtain the other user's SteamID64 from a trusted source such as your lobby membership list. The receiver can accept a request without sending anything. Register the handler before inviting a peer to connect. The wrapper never accepts a request merely because it arrived; sending to a peer does implicitly accept a session from that peer.

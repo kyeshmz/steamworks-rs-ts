@@ -163,7 +163,7 @@ pub mod networking_messages {
 
     fn update_session(
         steam_id64: BigInt,
-        operation: unsafe extern "C" fn(
+        operation: impl FnOnce(
             *mut sys::ISteamNetworkingMessages,
             *const sys::SteamNetworkingIdentity,
         ) -> bool,
@@ -185,19 +185,25 @@ pub mod networking_messages {
     /// Accept a known peer's pending request without sending a message.
     #[napi(strict)]
     pub fn accept_session_with_user(steam_id64: BigInt) -> Result<bool> {
-        update_session(
-            steam_id64,
-            sys::SteamAPI_ISteamNetworkingMessages_AcceptSessionWithUser,
-        )
+        update_session(steam_id64, |messages, id| unsafe {
+            sys::SteamAPI_ISteamNetworkingMessages_AcceptSessionWithUser(messages, id)
+        })
     }
 
     /// Close the peer's session on all channels. This does not block future requests.
     #[napi(strict)]
     pub fn close_session_with_user(steam_id64: BigInt) -> Result<bool> {
-        update_session(
-            steam_id64,
-            sys::SteamAPI_ISteamNetworkingMessages_CloseSessionWithUser,
-        )
+        update_session(steam_id64, |messages, id| unsafe {
+            sys::SteamAPI_ISteamNetworkingMessages_CloseSessionWithUser(messages, id)
+        })
+    }
+
+    #[napi(strict)]
+    pub fn close_channel_with_user(steam_id64: BigInt, channel: f64) -> Result<bool> {
+        let channel = checked_channel(Some(channel))? as i32;
+        update_session(steam_id64, |messages, id| unsafe {
+            sys::SteamAPI_ISteamNetworkingMessages_CloseChannelWithUser(messages, id, channel)
+        })
     }
 
     /// Replaces the failure handler. Omit the handler to stop listening.

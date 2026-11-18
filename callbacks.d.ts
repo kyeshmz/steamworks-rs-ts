@@ -33,6 +33,16 @@ export type ChatEntryType =
     | 'LinkBlocked'
 
 export interface CallbackReturns {
+    [client.callback.SteamCallback.ScreenshotRequested]: {}
+    [client.callback.SteamCallback.ScreenshotReady]: { handle: number; error: null } | { handle: null; error: string }
+    [client.callback.SteamCallback.GameRichPresenceJoinRequested]: {
+        friend_steam_id: bigint
+        connect: string
+    }
+    [client.callback.SteamCallback.FriendRichPresenceUpdate]: {
+        friend_steam_id: bigint
+        app_id: number
+    }
     [client.callback.SteamCallback.PersonaStateChange]: {
         steam_id: bigint
         flags: { bits: number }

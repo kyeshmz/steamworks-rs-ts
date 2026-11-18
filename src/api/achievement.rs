@@ -56,6 +56,14 @@ pub mod achievement {
         stats.get_achievement_names().unwrap_or_default()
     }
 
+    #[napi]
+    pub fn count() -> u32 {
+        crate::client::get_client()
+            .user_stats()
+            .get_num_achievements()
+            .unwrap_or_default()
+    }
+
     /// Use "name", "desc", or "hidden". The hidden flag is "0" or "1".
     #[napi]
     pub fn get_display_attribute(achievement: String, key: String) -> Option<String> {

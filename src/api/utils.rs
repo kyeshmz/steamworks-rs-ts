@@ -8,6 +8,18 @@ pub mod utils {
     use tokio::sync::oneshot;
 
     #[napi]
+    pub fn is_steam_in_big_picture_mode() -> napi::Result<bool> {
+        let _client = crate::client::get_client();
+        unsafe {
+            let utils = steamworks::sys::SteamAPI_SteamUtils_v010();
+            if utils.is_null() {
+                return Err(napi::Error::from_reason("Steam utilities unavailable"));
+            }
+            Ok(steamworks::sys::SteamAPI_ISteamUtils_IsSteamInBigPictureMode(utils))
+        }
+    }
+
+    #[napi]
     pub fn is_overlay_enabled() -> bool {
         crate::client::get_client().utils().is_overlay_enabled()
     }

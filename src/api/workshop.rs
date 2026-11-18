@@ -10,6 +10,15 @@ pub mod workshop {
     use steamworks::{ClientManager, PublishedFileId, UpdateHandle};
     use tokio::sync::oneshot;
 
+    pub(crate) fn published_file_id(id: &BigInt) -> Result<PublishedFileId, Error> {
+        match id.words.as_slice() {
+            &[value] if !id.sign_bit && value != 0 => Ok(PublishedFileId(value)),
+            _ => Err(Error::from_reason(
+                "Workshop item ID must be a positive unsigned 64-bit integer",
+            )),
+        }
+    }
+
     #[napi(object)]
     pub struct UgcResult {
         pub item_id: BigInt,
@@ -47,6 +56,58 @@ pub mod workshop {
         }
     }
 
+    #[derive(Debug)]
+    #[napi(object)]
+    pub struct KeyValueTag {
+        pub key: String,
+        pub value: String,
+    }
+
+    fn validate_key(key: &str) -> Result<(), Error> {
+        if key.is_empty()
+            || key.len() > 255
+            || !key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+        {
+            return Err(Error::from_reason(
+                "Workshop tag keys must be 1 to 255 ASCII letters, digits, or underscores",
+            ));
+        }
+        Ok(())
+    }
+
+    impl KeyValueTag {
+        pub(crate) fn validate(&self) -> Result<(), Error> {
+            validate_key(&self.key)?;
+            if self.value.len() > 255 || self.value.contains('\0') {
+                return Err(Error::from_reason(
+                    "Workshop tag values must be at most 255 UTF-8 bytes without NUL",
+                ));
+            }
+            Ok(())
+        }
+    }
+
+    #[napi]
+    pub enum ContentDescriptor {
+        NudityOrSexualContent,
+        FrequentViolenceOrGore,
+        AdultOnlySexualContent,
+        GratuitousSexualContent,
+        AnyMatureContent,
+    }
+
+    impl From<ContentDescriptor> for steamworks::UGCContentDescriptorID {
+        fn from(value: ContentDescriptor) -> Self {
+            match value {
+                ContentDescriptor::NudityOrSexualContent => Self::NudityOrSexualContent,
+                ContentDescriptor::FrequentViolenceOrGore => Self::FrequentViolenceOrGore,
+                ContentDescriptor::AdultOnlySexualContent => Self::AdultOnlySexualContent,
+                ContentDescriptor::GratuitousSexualContent => Self::GratuitousSexualContent,
+                ContentDescriptor::AnyMatureContent => Self::AnyMatureContent,
+            }
+        }
+    }
+
     #[napi(object)]
     pub struct UgcUpdate {
         pub title: Option<String>,
@@ -56,9 +117,56 @@ pub mod workshop {
         pub content_path: Option<String>,
         pub tags: Option<Vec<String>>,
         pub visibility: Option<UgcItemVisibility>,
+        pub metadata: Option<String>,
+        pub key_value_tags: Option<Vec<KeyValueTag>>,
+        pub remove_key_value_tags: Option<Vec<String>>,
+        pub remove_all_key_value_tags: Option<bool>,
+        pub allow_admin_tags: Option<bool>,
+        pub content_descriptors: Option<Vec<ContentDescriptor>>,
+        pub remove_content_descriptors: Option<Vec<ContentDescriptor>>,
     }
 
     impl UgcUpdate {
+        fn validate(&self) -> Result<(), Error> {
+            if self
+                .title
+                .iter()
+                .chain(&self.description)
+                .chain(&self.change_note)
+                .chain(&self.preview_path)
+                .chain(&self.content_path)
+                .chain(self.tags.iter().flatten())
+                .any(|s| s.contains('\0'))
+            {
+                return Err(Error::from_reason(
+                    "Workshop update strings must not contain NUL",
+                ));
+            }
+            if let Some(metadata) = &self.metadata {
+                if metadata.contains('\0')
+                    || metadata.len() >= steamworks::sys::k_cchDeveloperMetadataMax as usize
+                {
+                    return Err(Error::from_reason(
+                        "Workshop metadata must fit in 4999 UTF-8 bytes without NUL",
+                    ));
+                }
+            }
+            if let Some(tags) = &self.key_value_tags {
+                if tags.len() > 100 {
+                    return Err(Error::from_reason(
+                        "At most 100 key/value tags may be added per update",
+                    ));
+                }
+                for tag in tags {
+                    tag.validate()?;
+                }
+            }
+            for key in self.remove_key_value_tags.iter().flatten() {
+                validate_key(key)?;
+            }
+            Ok(())
+        }
+
         pub fn submit(
             self,
             mut update: UpdateHandle<ClientManager>,
@@ -79,7 +187,7 @@ pub mod workshop {
             }
 
             if let Some(tags) = self.tags {
-                update = update.tags(tags, false);
+                update = update.tags(tags, self.allow_admin_tags.unwrap_or(false));
             }
 
             if let Some(content_path) = self.content_path {
@@ -88,6 +196,25 @@ pub mod workshop {
 
             if let Some(visibility) = self.visibility {
                 update = update.visibility(visibility.into());
+            }
+
+            if let Some(metadata) = self.metadata {
+                update = update.metadata(&metadata);
+            }
+            if self.remove_all_key_value_tags.unwrap_or(false) {
+                update = update.remove_all_key_value_tags();
+            }
+            for key in self.remove_key_value_tags.into_iter().flatten() {
+                update = update.remove_key_value_tag(&key);
+            }
+            for tag in self.key_value_tags.into_iter().flatten() {
+                update = update.add_key_value_tag(&tag.key, &tag.value);
+            }
+            for descriptor in self.remove_content_descriptors.into_iter().flatten() {
+                update = update.remove_content_descriptor(descriptor.into());
+            }
+            for descriptor in self.content_descriptors.into_iter().flatten() {
+                update = update.add_content_descriptor(descriptor.into());
             }
 
             let change_note = self.change_note.as_deref();
@@ -219,6 +346,8 @@ pub mod workshop {
         update_details: UgcUpdate,
         app_id: Option<u32>,
     ) -> Result<UgcResult, Error> {
+        update_details.validate()?;
+        let item_id = published_file_id(&item_id)?;
         let client = crate::client::get_client();
 
         let app_id = app_id
@@ -228,9 +357,7 @@ pub mod workshop {
         let (tx, rx) = oneshot::channel();
 
         {
-            let update_handle = client
-                .ugc()
-                .start_item_update(app_id, PublishedFileId(item_id.get_u64().1));
+            let update_handle = client.ugc().start_item_update(app_id, item_id);
 
             update_details.submit(update_handle, |result| {
                 tx.send(result).unwrap();
@@ -271,6 +398,16 @@ pub mod workshop {
             .create_threadsafe_function(0, |ctx| Ok(vec![ctx.value]))
             .unwrap();
 
+        let item_id = match update_details
+            .validate()
+            .and_then(|()| published_file_id(&item_id))
+        {
+            Ok(id) => id,
+            Err(error) => {
+                error_callback.call(error, ThreadsafeFunctionCallMode::NonBlocking);
+                return;
+            }
+        };
         let client = crate::client::get_client();
 
         let app_id = app_id
@@ -278,9 +415,7 @@ pub mod workshop {
             .unwrap_or_else(|| client.utils().app_id());
 
         {
-            let update_handle = client
-                .ugc()
-                .start_item_update(app_id, PublishedFileId(item_id.get_u64().1));
+            let update_handle = client.ugc().start_item_update(app_id, item_id);
 
             let update_watch_handle = update_details.submit(update_handle, move |result| {
                 match result {

@@ -93,6 +93,15 @@ pub mod matchmaking {
         CString::new(value).map_err(|_| Error::from_reason("Unexpected NUL byte in lobby data"))
     }
 
+    fn member_id(value: BigInt) -> Result<u64, Error> {
+        match value.words.as_slice() {
+            [id] if !value.sign_bit && *id != 0 => Ok(*id),
+            _ => Err(Error::from_reason(
+                "Expected a nonzero unsigned 64-bit Steam ID",
+            )),
+        }
+    }
+
     fn raw_matchmaking(_client: &steamworks::Client) -> Result<*mut sys::ISteamMatchmaking, Error> {
         let mm = unsafe { sys::SteamAPI_SteamMatchmaking_v009() };
         if mm.is_null() {
@@ -238,6 +247,71 @@ pub mod matchmaking {
         pub fn get_member_limit(&self) -> Option<usize> {
             let client = crate::client::get_client();
             client.matchmaking().lobby_member_limit(self.lobby_id)
+        }
+
+        /// Owner only. Returns false if Steam refuses the new limit.
+        #[napi]
+        pub fn set_member_limit(&self, limit: f64) -> Result<bool, Error> {
+            if limit.fract() != 0.0 || !(0.0..=250.0).contains(&limit) {
+                return Err(Error::from_reason(
+                    "Lobby limit must be an integer from 0 to 250",
+                ));
+            }
+            let client = crate::client::get_client();
+            Ok(unsafe {
+                sys::SteamAPI_ISteamMatchmaking_SetLobbyMemberLimit(
+                    raw_matchmaking(&client)?,
+                    self.lobby_id.raw(),
+                    limit as i32,
+                )
+            })
+        }
+
+        /// Transfer ownership to a current lobby member. Only the current owner can do this.
+        #[napi]
+        pub fn set_owner(&self, steam_id64: BigInt) -> Result<bool, Error> {
+            let id = member_id(steam_id64)?;
+            let client = crate::client::get_client();
+            Ok(unsafe {
+                sys::SteamAPI_ISteamMatchmaking_SetLobbyOwner(
+                    raw_matchmaking(&client)?,
+                    self.lobby_id.raw(),
+                    id,
+                )
+            })
+        }
+
+        /// Change the lobby's visibility as its owner.
+        #[napi]
+        pub fn set_type(&self, lobby_type: LobbyType) -> Result<bool, Error> {
+            let lobby_type = match lobby_type {
+                LobbyType::Private => sys::ELobbyType::k_ELobbyTypePrivate,
+                LobbyType::FriendsOnly => sys::ELobbyType::k_ELobbyTypeFriendsOnly,
+                LobbyType::Public => sys::ELobbyType::k_ELobbyTypePublic,
+                LobbyType::Invisible => sys::ELobbyType::k_ELobbyTypeInvisible,
+            };
+            let client = crate::client::get_client();
+            Ok(unsafe {
+                sys::SteamAPI_ISteamMatchmaking_SetLobbyType(
+                    raw_matchmaking(&client)?,
+                    self.lobby_id.raw(),
+                    lobby_type,
+                )
+            })
+        }
+
+        /// Send a lobby invite without opening the overlay. Success does not mean the user joined.
+        #[napi]
+        pub fn invite_user(&self, steam_id64: BigInt) -> Result<bool, Error> {
+            let id = member_id(steam_id64)?;
+            let client = crate::client::get_client();
+            Ok(unsafe {
+                sys::SteamAPI_ISteamMatchmaking_InviteUserToLobby(
+                    raw_matchmaking(&client)?,
+                    self.lobby_id.raw(),
+                    id,
+                )
+            })
         }
 
         #[napi]

@@ -1,2 +1,3 @@
 - [Package loading and callback identifiers](load.md)
 - [Read-only Steam client calls](client.md)
+- [Inventory results and P2P sockets](inventory-sockets.md)

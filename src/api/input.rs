@@ -180,6 +180,60 @@ pub mod input {
             self.handle.clone()
         }
 
+        /// Read orientation, acceleration and angular velocity from a motion-capable controller.
+        #[napi]
+        pub fn get_motion_data(&self) -> MotionData {
+            let data = crate::client::get_client()
+                .input()
+                .get_motion_data(self.handle.get_u64().1);
+            MotionData {
+                rot_quat_x: data.rotQuatX.into(),
+                rot_quat_y: data.rotQuatY.into(),
+                rot_quat_z: data.rotQuatZ.into(),
+                rot_quat_w: data.rotQuatW.into(),
+                pos_accel_x: data.posAccelX.into(),
+                pos_accel_y: data.posAccelY.into(),
+                pos_accel_z: data.posAccelZ.into(),
+                rot_vel_x: data.rotVelX.into(),
+                rot_vel_y: data.rotVelY.into(),
+                rot_vel_z: data.rotVelZ.into(),
+            }
+        }
+
+        /// Set RGB on a supported controller, or restore the user's preferred color.
+        #[napi]
+        pub fn set_lightbar_color(
+            &self,
+            red: f64,
+            green: f64,
+            blue: f64,
+            restore_default_lightbar_color: Option<bool>,
+        ) -> Result<(), Error> {
+            if ![red, green, blue]
+                .iter()
+                .all(|v| v.fract() == 0.0 && (0.0..=255.0).contains(v))
+            {
+                return Err(Error::from_reason(
+                    "RGB values must be integers from 0 to 255",
+                ));
+            }
+            let flag = if restore_default_lightbar_color.unwrap_or(false) {
+                sys::ESteamInputLEDFlag::k_ESteamInputLEDFlag_RestoreUserDefault
+            } else {
+                sys::ESteamInputLEDFlag::k_ESteamInputLEDFlag_SetColor
+            };
+            with_input(|input| unsafe {
+                sys::SteamAPI_ISteamInput_SetLEDColor(
+                    input,
+                    self.handle.get_u64().1,
+                    red as u8,
+                    green as u8,
+                    blue as u8,
+                    flag as u32,
+                )
+            })
+        }
+
         #[napi]
         pub fn get_digital_action_origins(
             &self,
@@ -319,6 +373,20 @@ pub mod input {
                 )
             })
         }
+    }
+
+    #[napi(object)]
+    pub struct MotionData {
+        pub rot_quat_x: f64,
+        pub rot_quat_y: f64,
+        pub rot_quat_z: f64,
+        pub rot_quat_w: f64,
+        pub pos_accel_x: f64,
+        pub pos_accel_y: f64,
+        pub pos_accel_z: f64,
+        pub rot_vel_x: f64,
+        pub rot_vel_y: f64,
+        pub rot_vel_z: f64,
     }
 
     #[napi(object)]
