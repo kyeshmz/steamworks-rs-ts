@@ -33,6 +33,16 @@ export type ChatEntryType =
     | 'LinkBlocked'
 
 export interface CallbackReturns {
+    [client.callback.SteamCallback.SteamInputDeviceConnected]: { device_handle: number | bigint }
+    [client.callback.SteamCallback.SteamInputDeviceDisconnected]: { device_handle: number | bigint }
+    [client.callback.SteamCallback.SteamInventoryDefinitionUpdate]: null
+    [client.callback.SteamCallback.SteamInventoryFullUpdate]: { handle: number }
+    [client.callback.SteamCallback.ValidateAuthTicketResponse]: {
+        steam_id: bigint
+        owner_steam_id: bigint
+        /** Steam EAuthSessionResponse. Only zero indicates success. */
+        response: number
+    }
     [client.callback.SteamCallback.ScreenshotRequested]: {}
     [client.callback.SteamCallback.ScreenshotReady]: { handle: number; error: null } | { handle: null; error: string }
     [client.callback.SteamCallback.GameRichPresenceJoinRequested]: {

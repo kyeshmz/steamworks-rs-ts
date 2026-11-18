@@ -27,7 +27,40 @@ async function run() {
     Atomics.store(gate, 0, 1)
     Atomics.notify(gate, 0)
     await initialized
-    const { inventory } = steam.init()
+    const { inventory, auth, callback, cloud, voice, runtime } = steam.init()
+    assert.equal(cloud.beginFileWriteBatch(), true)
+    assert.equal(cloud.beginFileWriteBatch(), false)
+    for (const mask of [9, 0xffffffff]) {
+        assert.equal(cloud.setSyncPlatforms('cross.sav', mask), true)
+        assert.equal(cloud.getSyncPlatforms('cross.sav'), mask)
+    }
+    assert.equal(cloud.endFileWriteBatch(), true)
+    assert.deepEqual(cloud.getQuota(), { totalBytes: (1n << 64n) - 1n, availableBytes: (1n << 64n) - 2n })
+    assert.equal(voice.getAvailableVoice(), 0)
+    assert.deepEqual(voice.getVoice(), Buffer.alloc(0))
+    assert.deepEqual(voice.decompressVoice(Buffer.from([123]), 24000), Buffer.alloc(24000, 42))
+    const peer = 76561197960265729n
+    for (const invalid of [0n, -1n, 1n << 64n, 1]) {
+        assert.throws(() => auth.beginAuthSession(invalid, Buffer.from('bad')))
+        assert.throws(() => auth.endAuthSession(invalid))
+    }
+    assert.throws(() => auth.beginAuthSession(peer, 'bad'))
+    assert.throws(() => auth.beginAuthSession(peer, Buffer.alloc(0)), /nonempty ticket/)
+    assert.throws(() => auth.beginAuthSession(peer, Buffer.from('bad')), /invalid ticket/)
+    const events = []
+    let listener
+    await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('missing auth validation')), 3000)
+        listener = callback.register(steam.SteamCallback.ValidateAuthTicketResponse, event => {
+            events.push(event)
+            if (events.length === 2) { clearTimeout(timer); resolve() }
+        })
+        assert.equal(auth.beginAuthSession(peer, Buffer.from([1, 0, 255])), undefined)
+    })
+    assert.deepEqual(events, [0, 10].map(response => ({ steam_id: peer, owner_steam_id: peer + 1n, response })))
+    assert.ok(runtime.pumpStats(true).runs > 0)
+    auth.endAuthSession(peer)
+    listener.disconnect()
     const itemId = (1n << 64n) - 2n
     const item = { itemId, definition: 8, quantity: 2, flags: 1 }
     const props = { itemId, definition: 8, quantity: 2, properties: { name: 'Token', quantity: '65538' } }

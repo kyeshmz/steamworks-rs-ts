@@ -20,13 +20,88 @@ int SteamAPI_InitFlat(char *message) {
 void SteamAPI_ManualDispatch_Init(void) {}
 int SteamAPI_GetHSteamPipe(void) { return 1; }
 void SteamAPI_ManualDispatch_RunFrame(int pipe) {}
-bool SteamAPI_ManualDispatch_GetNextCallback(int pipe, void *msg) { return false; }
+#pragma pack(push, 4)
+struct validation { uint64_t peer; uint32_t response; uint64_t owner; };
+struct callback_msg { int user, id; void *data; int size; };
+#pragma pack(pop)
+static const uint64_t peer = 76561197960265729ULL;
+static struct validation validation;
+static _Thread_local bool auth_thread;
+static int accepted, rejected, ended, delivered, freed;
+static bool active;
+
+void *SteamAPI_SteamUser_v023(void) { return &init_calls; }
+int SteamAPI_ISteamUser_BeginAuthSession(void *p, const void *ticket, int len, uint64_t id) {
+    assert(p == &init_calls && id == peer && len == 3);
+    if (!memcmp(ticket, "bad", 3)) { ++rejected; return 1; }
+    assert(!active && !memcmp(ticket, "\x01\x00\xff", 3));
+    ++accepted;
+    active = auth_thread = true;
+    return 0;
+}
+void SteamAPI_ISteamUser_EndAuthSession(void *p, uint64_t id) {
+    assert(p == &init_calls && active && id == peer);
+    active = false;
+    ++ended;
+}
+bool SteamAPI_ManualDispatch_GetNextCallback(int pipe, struct callback_msg *msg) {
+    if (!auth_thread || !active || delivered == 2) return false;
+    assert(freed == delivered);
+    validation = (struct validation){peer, delivered ? 10 : 0, peer + 1};
+    *msg = (struct callback_msg){1, 143, &validation, sizeof(validation)};
+    ++delivered;
+    return true;
+}
+void SteamAPI_ManualDispatch_FreeLastCallback(int pipe) {
+    assert(auth_thread && freed + 1 == delivered);
+    memset(&validation, 0, sizeof(validation));
+    ++freed;
+}
 void SteamAPI_Shutdown(void) { assert(false); }
 void *SteamAPI_SteamUtils_v010(void) { return &init_calls; }
 void *SteamAPI_SteamUserStats_v012(void) { return &init_calls; }
 bool SteamAPI_ISteamUserStats_RequestCurrentStats(void *p) { return true; }
 uint32_t SteamAPI_ISteamUtils_GetAppID(void *p) { return 480; }
 void *SteamAPI_SteamInventory_v003(void) { return &init_calls; }
+
+static bool batch;
+static uint32_t mask;
+void *SteamAPI_SteamRemoteStorage_v016(void) { return &mask; }
+bool SteamAPI_ISteamRemoteStorage_BeginFileWriteBatch(void *p) {
+    if (batch) return false;
+    return batch = true;
+}
+bool SteamAPI_ISteamRemoteStorage_EndFileWriteBatch(void *p) {
+    if (!batch) return false;
+    batch = false;
+    return true;
+}
+bool SteamAPI_ISteamRemoteStorage_SetSyncPlatforms(void *p, const char *name, uint32_t value) {
+    assert(p == &mask && batch && !strcmp(name, "cross.sav"));
+    mask = value;
+    return true;
+}
+uint32_t SteamAPI_ISteamRemoteStorage_GetSyncPlatforms(void *p, const char *name) {
+    assert(p == &mask && !strcmp(name, "cross.sav"));
+    return mask;
+}
+bool SteamAPI_ISteamRemoteStorage_GetQuota(void *p, uint64_t *total, uint64_t *available) {
+    *total = UINT64_MAX; *available = UINT64_MAX - 1; return true;
+}
+
+int SteamAPI_ISteamUser_GetAvailableVoice(void *p, uint32_t *compressed, uint32_t *unused, uint32_t hz) {
+    assert(!unused && !hz);
+    *compressed = 0;
+    return 3;
+}
+int SteamAPI_ISteamUser_DecompressVoice(void *p, const uint8_t *src, uint32_t len,
+        uint8_t *dst, uint32_t capacity, uint32_t *written, uint32_t hz) {
+    assert(len == 1 && src[0] == 123 && hz == 24000);
+    *written = 24000;
+    if (capacity < *written) return 4;
+    memset(dst, 42, *written);
+    return 0;
+}
 
 bool SteamAPI_ISteamInventory_GetAllItems(void *p, int *handle) {
     *handle = atomic_fetch_add(&submissions, 1);
@@ -72,5 +147,7 @@ __attribute__((destructor)) static void verify_cleanup(void) {
     assert(atomic_load(&init_calls) == 2);
     assert(atomic_load(&submissions) == 9);
     assert(atomic_load(&drops) == atomic_load(&submissions));
+    assert(accepted == 1 && rejected == 1 && ended == 1 && freed == 2 && !active);
+    fputs("auth fixture: rejected submission, accepted submission, OK then identity failure, session ended\n", stderr);
     fputs("inventory fixture: 1 failed init, 1 successful init, 9 results destroyed\n", stderr);
 }

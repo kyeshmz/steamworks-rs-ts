@@ -73,6 +73,22 @@ pub mod cloud {
         })
     }
 
+    /// Hints to Steam that several writes belong together. This is not a transaction.
+    #[napi]
+    pub fn begin_file_write_batch() -> Result<bool, Error> {
+        with_storage(|storage| unsafe {
+            sys::SteamAPI_ISteamRemoteStorage_BeginFileWriteBatch(storage)
+        })
+    }
+
+    /// Call after all writes have settled, even if one failed.
+    #[napi]
+    pub fn end_file_write_batch() -> Result<bool, Error> {
+        with_storage(|storage| unsafe {
+            sys::SteamAPI_ISteamRemoteStorage_EndFileWriteBatch(storage)
+        })
+    }
+
     #[napi]
     pub struct FileInfo {
         pub name: String,

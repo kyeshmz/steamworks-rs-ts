@@ -143,12 +143,45 @@ pub mod friends {
         })
     }
 
-    /// Returns the IDs of immediate friends, excluding pending invitations.
     #[napi]
-    pub fn get_friends() -> Vec<BigInt> {
+    pub enum FriendFilter {
+        Immediate,
+        Blocked,
+        FriendshipRequested,
+        RequestingFriendship,
+        RequestingInfo,
+        Ignored,
+        IgnoredFriend,
+        ClanMember,
+        OnGameServer,
+        ChatMember,
+        All,
+    }
+
+    impl From<FriendFilter> for FriendFlags {
+        fn from(value: FriendFilter) -> Self {
+            match value {
+                FriendFilter::Immediate => Self::IMMEDIATE,
+                FriendFilter::Blocked => Self::BLOCKED,
+                FriendFilter::FriendshipRequested => Self::FRIENDSHIP_REQUESTED,
+                FriendFilter::RequestingFriendship => Self::REQUESTING_FRIENDSHIP,
+                FriendFilter::RequestingInfo => Self::REQUESTING_INFO,
+                FriendFilter::Ignored => Self::IGNORED,
+                FriendFilter::IgnoredFriend => Self::IGNORED_FRIEND,
+                FriendFilter::ClanMember => Self::CLAN_MEMBER,
+                FriendFilter::OnGameServer => Self::ON_GAME_SERVER,
+                FriendFilter::ChatMember => Self::CHAT_MEMBER,
+                FriendFilter::All => Self::ALL,
+            }
+        }
+    }
+
+    /// Defaults to immediate friends, excluding pending invitations.
+    #[napi]
+    pub fn get_friends(filter: Option<FriendFilter>) -> Vec<BigInt> {
         crate::client::get_client()
             .friends()
-            .get_friends(FriendFlags::IMMEDIATE)
+            .get_friends(filter.unwrap_or(FriendFilter::Immediate).into())
             .into_iter()
             .map(|f| f.id().raw().into())
             .collect()

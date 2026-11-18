@@ -1,6 +1,29 @@
 use napi_derive::napi;
 use steamworks::sys;
 
+struct TicketValidation {
+    peer: u64,
+    owner: u64,
+    response: u32,
+}
+
+// The pinned safe callback panics for SDK response 10 (network identity failure).
+unsafe impl steamworks::Callback for TicketValidation {
+    const ID: i32 = sys::ValidateAuthTicketResponse_t_k_iCallback as i32;
+    const SIZE: i32 = std::mem::size_of::<sys::ValidateAuthTicketResponse_t>() as i32;
+    unsafe fn from_raw(raw: *mut std::ffi::c_void) -> Self {
+        let event = raw.cast::<sys::ValidateAuthTicketResponse_t>();
+        Self {
+            peer: std::ptr::addr_of!((*event).m_SteamID.m_steamid.m_unAll64Bits).read_unaligned(),
+            owner: std::ptr::addr_of!((*event).m_OwnerSteamID.m_steamid.m_unAll64Bits)
+                .read_unaligned(),
+            response: std::ptr::addr_of!((*event).m_eAuthSessionResponse)
+                .cast::<u32>()
+                .read_unaligned(),
+        }
+    }
+}
+
 #[derive(serde::Serialize)]
 struct PresenceJoin {
     friend_steam_id: u64,
@@ -87,19 +110,62 @@ pub mod callback {
         FriendRichPresenceUpdate,
         ScreenshotRequested,
         ScreenshotReady,
+        ValidateAuthTicketResponse,
+        SteamInputDeviceConnected,
+        SteamInputDeviceDisconnected,
+        SteamInventoryDefinitionUpdate,
+        SteamInventoryFullUpdate,
     }
 
     #[napi(ts_generic_types = "C extends keyof import('./callbacks').CallbackReturns")]
     pub fn register(
         #[napi(ts_arg_type = "C")] steam_callback: SteamCallback,
         #[napi(ts_arg_type = "(value: import('./callbacks').CallbackReturns[C]) => void")] handler: JsFunction,
-    ) -> Handle {
+    ) -> napi::Result<Handle> {
+        if let SteamCallback::ValidateAuthTicketResponse = steam_callback {
+            let listener: ThreadsafeFunction<super::TicketValidation, ErrorStrategy::Fatal> =
+                handler.create_threadsafe_function(
+                    0,
+                    |ctx: napi::threadsafe_function::ThreadSafeCallContext<
+                        super::TicketValidation,
+                    >| {
+                        let mut value = ctx.env.create_object()?;
+                        value.set_named_property(
+                            "steam_id",
+                            ctx.env.create_bigint_from_u64(ctx.value.peer)?,
+                        )?;
+                        value.set_named_property(
+                            "owner_steam_id",
+                            ctx.env.create_bigint_from_u64(ctx.value.owner)?,
+                        )?;
+                        value.set_named_property("response", ctx.value.response)?;
+                        Ok(vec![value])
+                    },
+                )?;
+            let handle = crate::client::get_client().register_callback(move |event| {
+                listener.call(event, ThreadsafeFunctionCallMode::Blocking);
+            });
+            return Ok(Handle {
+                handle: Some(handle),
+            });
+        }
         let threadsafe_handler: ThreadsafeFunction<serde_json::Value, ErrorStrategy::Fatal> =
-            handler
-                .create_threadsafe_function(0, |ctx| Ok(vec![ctx.value]))
-                .unwrap();
+            handler.create_threadsafe_function(0, |ctx| Ok(vec![ctx.value]))?;
 
         let handle = match steam_callback {
+            SteamCallback::ValidateAuthTicketResponse => unreachable!(),
+            SteamCallback::SteamInputDeviceConnected => {
+                register_callback::<crate::api::steam_events::DeviceConnected>(threadsafe_handler)
+            }
+            SteamCallback::SteamInputDeviceDisconnected => register_callback::<
+                crate::api::steam_events::DeviceDisconnected,
+            >(threadsafe_handler),
+            SteamCallback::SteamInventoryDefinitionUpdate => register_callback::<
+                crate::api::steam_events::InventoryDefinitionUpdate,
+            >(threadsafe_handler),
+            SteamCallback::SteamInventoryFullUpdate => register_callback::<
+                crate::api::steam_events::InventoryFullUpdate,
+            >(threadsafe_handler),
             SteamCallback::PersonaStateChange => {
                 register_callback::<steamworks::PersonaStateChange>(threadsafe_handler)
             }
@@ -161,9 +227,9 @@ pub mod callback {
             ),
         };
 
-        Handle {
+        Ok(Handle {
             handle: Some(handle),
-        }
+        })
     }
 
     fn register_callback<C>(

@@ -47,3 +47,35 @@ Poll `receiveMessages(handle, maxMessages?)` for an array of `Buffer` payloads o
 Call `closeConnection(handle, linger?)` when finished. The default is not to linger. Pass `true` to let Steam try to flush queued reliable messages. Call `closeListenSocket(listener)` when you stop hosting. This also closes connections tied to that listener. Do not reuse a closed handle. Omit the argument to `setConnectionStatusHandler()` to remove the handler. Installing another handler replaces the previous one.
 
 To warm up Steam Datagram Relay, call `initRelayNetworkAccess()`. `relayStatus()` returns `Current` when the relay network is ready. Other possible values are `NeverTried`, `Waiting`, `Attempting`, `Unknown`, `CannotTry`, `Failed`, `Previously`, and `Retrying`. Relay readiness does not indicate that any particular peer is connected.
+
+## Listen on an IP address
+
+Use `createListenSocketIp(port, address?)` for direct UDP rather than Steam P2P routing. Omitting the address binds to `127.0.0.1`, so only clients on the same machine can reach it. For IPv6 loopback, pass `::1`. For remote clients, choose a local interface explicitly. A wildcard listener can expose the port on multiple interfaces.
+
+Call `connectByIpAddress(address, port)` with the listener's literal IPv4 or IPv6 address and a port from 1 to 65535. Pass the address separately from the port, without brackets, a DNS name, or a zone ID. A wildcard is not a destination.
+
+Use the same status handler, explicit acceptance, and close functions as for P2P. A direct IP peer might not supply a SteamID. Do not treat an absent SteamID or a network address as proof of identity.
+
+## Read messages from several connections
+
+Create a native poll group and assign each connection you want to read. A connection belongs to at most one group. Assignment moves it from any previous group.
+
+```js
+const group = sockets.createPollGroup()
+try {
+    for (const connection of connections) {
+        if (!sockets.setConnectionPollGroup(connection, group)) {
+            throw new Error('Cannot assign socket to poll group')
+        }
+    }
+    for (const { connection, data } of sockets.receiveMessagesOnPollGroup(group, 32)) {
+        handleMessage(connection, data)
+    }
+} finally {
+    sockets.destroyPollGroup(group)
+}
+```
+
+Each read consumes queued messages and returns an empty array if none are available. The batch limit and default match `receiveMessages`. Each entry contains the receiving connection's handle and a copied `Buffer`. Reading a message through its connection or group consumes it for both.
+
+Pass `0` as the group to `setConnectionPollGroup` to detach one connection. `destroyPollGroup(group)` detaches all remaining members without closing their connections. Both calls return `false` for an invalid handle.

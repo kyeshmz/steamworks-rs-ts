@@ -54,6 +54,10 @@ export declare namespace apps {
   export function currentBetaName(): string | null
 }
 export declare namespace auth {
+  /** Submit a remote peer's ticket. Wait for ValidateAuthTicketResponse before granting access. */
+  export function beginAuthSession(steamId64: bigint, ticket: Buffer): void
+  /** End an accepted submission when the peer disconnects or validation fails. */
+  export function endAuthSession(steamId64: bigint): void
   /**
    * @param steamId64 - The user steam id or game server steam id. Use as NetworkIdentity of the remote system that will authenticate the ticket. If it is peer-to-peer then the user steam ID. If it is a game server, then the game server steam ID may be used if it was obtained from a trusted 3rd party
    * @param timeoutSeconds - The number of seconds to wait for the ticket to be validated. Default value is 10 seconds.
@@ -87,7 +91,12 @@ export declare namespace callback {
     GameRichPresenceJoinRequested = 12,
     FriendRichPresenceUpdate = 13,
     ScreenshotRequested = 14,
-    ScreenshotReady = 15
+    ScreenshotReady = 15,
+    ValidateAuthTicketResponse = 16,
+    SteamInputDeviceConnected = 17,
+    SteamInputDeviceDisconnected = 18,
+    SteamInventoryDefinitionUpdate = 19,
+    SteamInventoryFullUpdate = 20
   }
   export function register<C extends keyof import('./callbacks').CallbackReturns>(steamCallback: C, handler: (value: import('./callbacks').CallbackReturns[C]) => void): Handle
   export class Handle {
@@ -106,6 +115,10 @@ export declare namespace cloud {
     availableBytes: bigint
   }
   export function getQuota(): CloudQuota | null
+  /** Hints to Steam that several writes belong together. This is not a transaction. */
+  export function beginFileWriteBatch(): boolean
+  /** Call after all writes have settled, even if one failed. */
+  export function endFileWriteBatch(): boolean
   export function isEnabledForAccount(): boolean
   export function isEnabledForApp(): boolean
   export function setEnabledForApp(enabled: boolean): void
@@ -149,8 +162,21 @@ export declare namespace friends {
   export function getCoplayFriends(): Array<CoplayFriend>
   export function setPlayedWith(steamId64: bigint): void
   export function getRichPresenceKeys(steamId64: bigint): Array<string>
-  /** Returns the IDs of immediate friends, excluding pending invitations. */
-  export function getFriends(): Array<bigint>
+  export const enum FriendFilter {
+    Immediate = 0,
+    Blocked = 1,
+    FriendshipRequested = 2,
+    RequestingFriendship = 3,
+    RequestingInfo = 4,
+    Ignored = 5,
+    IgnoredFriend = 6,
+    ClanMember = 7,
+    OnGameServer = 8,
+    ChatMember = 9,
+    All = 10
+  }
+  /** Defaults to immediate friends, excluding pending invitations. */
+  export function getFriends(filter?: FriendFilter | undefined | null): Array<bigint>
   export function getPersonaName(steamId64: bigint): string
   export const enum AvatarSize {
     Small = 0,
@@ -218,6 +244,8 @@ export declare namespace input {
   export function getStringForActionOrigin(origin: number): string
   export function setInputActionManifestFilePath(path: string): boolean
   export function runFrame(): void
+  /** Enable hotplug notifications after registering the device callbacks. */
+  export function enableDeviceCallbacks(): void
   export function shutdown(): void
   export class Controller {
     activateActionSet(actionSetHandle: bigint): void
@@ -493,6 +521,8 @@ export declare namespace networking_messages {
   export function setSessionFailedHandler(handler?: (failure: SessionFailure) => void): void
 }
 export declare namespace networking_sockets {
+  export function createListenSocketIp(port: number, address?: string | undefined | null): number
+  export function connectByIpAddress(address: string, port: number): number
   export function createListenSocketP2P(virtualPort: number): number
   export function connectP2P(steamId64: bigint, virtualPort: number): number
   export interface ConnectionInfo {
@@ -507,6 +537,14 @@ export declare namespace networking_sockets {
   export function acceptConnection(connection: number): void
   export function sendMessage(connection: number, data: Buffer, reliable?: boolean | undefined | null): bigint
   export function receiveMessages(connection: number, maxMessages?: number | undefined | null): Array<Buffer>
+  export interface PollGroupMessage {
+    connection: number
+    data: Buffer
+  }
+  export function createPollGroup(): number
+  export function setConnectionPollGroup(connection: number, group: number): boolean
+  export function receiveMessagesOnPollGroup(group: number, maxMessages?: number | undefined | null): Array<PollGroupMessage>
+  export function destroyPollGroup(group: number): boolean
   export function closeConnection(connection: number, linger?: boolean | undefined | null): boolean
   export function closeListenSocket(socket: number): boolean
   export function initRelayNetworkAccess(): void
@@ -539,6 +577,18 @@ export declare namespace overlay {
   export function activateInviteDialog(lobbyId: bigint): void
   export function activateToWebPage(url: string): void
   export function activateToStore(appId: number, flag: StoreFlag): void
+}
+export declare namespace runtime {
+  export interface PumpStats {
+    runs: number
+    gaps: number
+    meanGapUs: number
+    maxGapUs: number
+    lastGapUs: number
+    maxRunUs: number
+  }
+  /** Timing of completed Steam callback pumps. A reset starts a fresh measurement window. */
+  export function pumpStats(reset?: boolean | undefined | null): PumpStats
 }
 export declare namespace screenshots {
   /** Supply tightly packed RGB24 rows, without alpha or stride padding. */
@@ -591,6 +641,8 @@ export declare namespace utils {
 export declare namespace voice {
   export function startVoiceRecording(): void
   export function stopVoiceRecording(): void
+  /** Returns the compressed byte count without consuming any recorded samples. */
+  export function getAvailableVoice(): number
   export function getVoice(): Buffer
   export function decompressVoice(compressed: Buffer, sampleRate: number): Buffer
   export function getVoiceOptimalSampleRate(): number

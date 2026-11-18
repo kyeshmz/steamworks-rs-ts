@@ -7,7 +7,7 @@ pub mod networking_sockets {
         threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode},
         Env, Error, JsFunction, Result,
     };
-    use std::{mem::MaybeUninit, ptr, slice};
+    use std::{mem::MaybeUninit, net::IpAddr, ptr, slice};
     use steamworks::{networking_types::NetworkingIdentity, sys, Callback};
 
     fn sockets() -> Result<*mut sys::ISteamNetworkingSockets> {
@@ -41,6 +41,84 @@ pub mod networking_sockets {
         } else {
             Ok(handle)
         }
+    }
+
+    fn parse_ip(address: &str) -> Result<IpAddr> {
+        address
+            .parse()
+            .map_err(|_| Error::from_reason("Expected a literal IPv4 or IPv6 address"))
+    }
+
+    fn socket_address(ip: IpAddr, port: f64) -> Result<sys::SteamNetworkingIPAddr> {
+        let port = integer(port, 1, 65535, "port")? as u16;
+        unsafe {
+            let mut addr = std::mem::zeroed();
+            match ip {
+                IpAddr::V4(v4) => {
+                    sys::SteamAPI_SteamNetworkingIPAddr_SetIPv4(&mut addr, v4.into(), port)
+                }
+                IpAddr::V6(v6) => sys::SteamAPI_SteamNetworkingIPAddr_SetIPv6(
+                    &mut addr,
+                    v6.octets().as_ptr(),
+                    port,
+                ),
+            }
+            Ok(addr)
+        }
+    }
+
+    #[cfg(test)]
+    #[test]
+    fn socket_address_preserves_network_bytes_and_host_port() {
+        for ip in ["192.0.2.123", "2001:db8:abcd::1234"] {
+            let ip = parse_ip(ip).unwrap();
+            let addr = socket_address(ip, 31457.0).unwrap();
+            let expected = match ip {
+                IpAddr::V4(v4) => v4.to_ipv6_mapped(),
+                IpAddr::V6(v6) => v6,
+            };
+            let port = addr.m_port;
+            assert_eq!(port, 31457);
+            assert_eq!(unsafe { addr.__bindgen_anon_1.m_ipv6 }, expected.octets());
+        }
+    }
+
+    #[napi(strict)]
+    pub fn create_listen_socket_ip(port: f64, address: Option<String>) -> Result<u32> {
+        let addr = socket_address(parse_ip(address.as_deref().unwrap_or("127.0.0.1"))?, port)?;
+        created(
+            unsafe {
+                sys::SteamAPI_ISteamNetworkingSockets_CreateListenSocketIP(
+                    sockets()?,
+                    &addr,
+                    0,
+                    ptr::null(),
+                )
+            },
+            "CreateListenSocketIP",
+        )
+    }
+
+    #[napi(strict)]
+    pub fn connect_by_ip_address(address: String, port: f64) -> Result<u32> {
+        let ip = parse_ip(&address)?;
+        if ip.to_canonical().is_unspecified() {
+            return Err(Error::from_reason(
+                "Expected a non-wildcard destination address",
+            ));
+        }
+        let addr = socket_address(ip, port)?;
+        created(
+            unsafe {
+                sys::SteamAPI_ISteamNetworkingSockets_ConnectByIPAddress(
+                    sockets()?,
+                    &addr,
+                    0,
+                    ptr::null(),
+                )
+            },
+            "ConnectByIPAddress",
+        )
     }
 
     #[napi(strict)]
@@ -213,9 +291,17 @@ pub mod networking_sockets {
         }
     }
 
-    #[napi(strict)]
-    pub fn receive_messages(connection: f64, max_messages: Option<f64>) -> Result<Vec<Buffer>> {
-        let conn = handle(connection)?;
+    fn receive<T>(
+        target: u32,
+        max_messages: Option<f64>,
+        read: unsafe extern "C" fn(
+            *mut sys::ISteamNetworkingSockets,
+            u32,
+            *mut *mut sys::SteamNetworkingMessage_t,
+            i32,
+        ) -> i32,
+        wrap: impl Fn(u32, Buffer) -> T,
+    ) -> Result<Vec<T>> {
         let limit = integer(
             max_messages.unwrap_or(10.0),
             1,
@@ -223,16 +309,9 @@ pub mod networking_sockets {
             "maxMessages",
         )?;
         let mut batch = Batch([ptr::null_mut(); MAX_BATCH]);
-        let n = unsafe {
-            sys::SteamAPI_ISteamNetworkingSockets_ReceiveMessagesOnConnection(
-                sockets()?,
-                conn,
-                batch.0.as_mut_ptr(),
-                limit as i32,
-            )
-        };
+        let n = unsafe { read(sockets()?, target, batch.0.as_mut_ptr(), limit as i32) };
         if !(0..=limit as i32).contains(&n) {
-            return Err(Error::from_reason("ReceiveMessagesOnConnection failed"));
+            return Err(Error::from_reason("Steam socket receive failed"));
         }
         batch.0[..n as usize]
             .iter()
@@ -242,18 +321,71 @@ pub mod networking_sockets {
                     .ok_or_else(|| Error::from_reason("Missing Steam message"))?;
                 let len = message.m_cbSize;
                 if len == 0 {
-                    return Ok(Vec::new().into());
+                    return Ok(wrap(message.m_conn, Vec::new().into()));
                 }
                 if len < 0 || message.m_pData.is_null() {
                     return Err(Error::from_reason("Invalid Steam message payload"));
                 }
-                Ok(
+                Ok(wrap(
+                    message.m_conn,
                     slice::from_raw_parts(message.m_pData.cast::<u8>(), len as usize)
                         .to_vec()
                         .into(),
-                )
+                ))
             })
             .collect()
+    }
+
+    #[napi(strict)]
+    pub fn receive_messages(connection: f64, max_messages: Option<f64>) -> Result<Vec<Buffer>> {
+        receive(
+            handle(connection)?,
+            max_messages,
+            sys::SteamAPI_ISteamNetworkingSockets_ReceiveMessagesOnConnection,
+            |_, data| data,
+        )
+    }
+
+    #[napi(object)]
+    pub struct PollGroupMessage {
+        pub connection: u32,
+        pub data: Buffer,
+    }
+
+    #[napi]
+    pub fn create_poll_group() -> Result<u32> {
+        created(
+            unsafe { sys::SteamAPI_ISteamNetworkingSockets_CreatePollGroup(sockets()?) },
+            "CreatePollGroup",
+        )
+    }
+
+    #[napi(strict)]
+    pub fn set_connection_poll_group(connection: f64, group: f64) -> Result<bool> {
+        let conn = handle(connection)?;
+        let group = integer(group, 0, u32::MAX, "group")?;
+        Ok(unsafe {
+            sys::SteamAPI_ISteamNetworkingSockets_SetConnectionPollGroup(sockets()?, conn, group)
+        })
+    }
+
+    #[napi(strict)]
+    pub fn receive_messages_on_poll_group(
+        group: f64,
+        max_messages: Option<f64>,
+    ) -> Result<Vec<PollGroupMessage>> {
+        receive(
+            handle(group)?,
+            max_messages,
+            sys::SteamAPI_ISteamNetworkingSockets_ReceiveMessagesOnPollGroup,
+            |connection, data| PollGroupMessage { connection, data },
+        )
+    }
+
+    #[napi(strict)]
+    pub fn destroy_poll_group(group: f64) -> Result<bool> {
+        let group = handle(group)?;
+        Ok(unsafe { sys::SteamAPI_ISteamNetworkingSockets_DestroyPollGroup(sockets()?, group) })
     }
 
     #[napi(strict)]

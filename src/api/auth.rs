@@ -11,6 +11,41 @@ pub mod auth {
     };
     use tokio::sync::oneshot;
 
+    fn session_peer(id: BigInt) -> Result<SteamId, Error> {
+        let (_, raw, lossless) = id.get_u64();
+        if !lossless || raw == 0 {
+            return Err(Error::from_reason(
+                "Expected a nonzero unsigned 64-bit Steam ID",
+            ));
+        }
+        Ok(SteamId::from_raw(raw))
+    }
+
+    /// Submit a remote peer's ticket. Wait for ValidateAuthTicketResponse before granting access.
+    #[napi(strict)]
+    pub fn begin_auth_session(steam_id64: BigInt, ticket: Buffer) -> Result<(), Error> {
+        let peer = session_peer(steam_id64)?;
+        if ticket.is_empty() || ticket.len() > i32::MAX as usize {
+            return Err(Error::from_reason(
+                "Expected a nonempty ticket fitting a signed 32-bit length",
+            ));
+        }
+        crate::client::get_client()
+            .user()
+            .begin_authentication_session(peer, &ticket)
+            .map_err(|error| Error::from_reason(error.to_string()))
+    }
+
+    /// End an accepted submission when the peer disconnects or validation fails.
+    #[napi(strict)]
+    pub fn end_auth_session(steam_id64: BigInt) -> Result<(), Error> {
+        let peer = session_peer(steam_id64)?;
+        crate::client::get_client()
+            .user()
+            .end_authentication_session(peer);
+        Ok(())
+    }
+
     #[napi]
     pub struct Ticket {
         pub(crate) data: Vec<u8>,

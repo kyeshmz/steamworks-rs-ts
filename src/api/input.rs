@@ -507,6 +507,12 @@ pub mod input {
         crate::client::get_client().input().run_frame();
     }
 
+    /// Enable hotplug notifications after registering the device callbacks.
+    #[napi]
+    pub fn enable_device_callbacks() -> Result<(), Error> {
+        with_input(|input| unsafe { sys::SteamAPI_ISteamInput_EnableDeviceCallbacks(input) })
+    }
+
     #[napi]
     pub fn shutdown() {
         let client = crate::client::get_client();

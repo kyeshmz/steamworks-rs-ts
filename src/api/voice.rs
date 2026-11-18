@@ -46,17 +46,28 @@ pub mod voice {
         Ok(())
     }
 
-    #[napi]
-    pub fn get_voice() -> Result<Buffer> {
-        let user = user()?;
+    fn available(user: *mut sys::ISteamUser) -> Result<u32> {
         let mut available = 0;
         let status = unsafe {
             sys::SteamAPI_ISteamUser_GetAvailableVoice(user, &mut available, ptr::null_mut(), 0)
         };
         if status == k_EVoiceResultNoData {
-            return Ok(Vec::new().into());
+            return Ok(0);
         }
         check_status("GetAvailableVoice", status)?;
+        Ok(available)
+    }
+
+    /// Returns the compressed byte count without consuming any recorded samples.
+    #[napi]
+    pub fn get_available_voice() -> Result<u32> {
+        available(user()?)
+    }
+
+    #[napi]
+    pub fn get_voice() -> Result<Buffer> {
+        let user = user()?;
+        let available = available(user)?;
         if available == 0 {
             return Ok(Vec::new().into());
         }

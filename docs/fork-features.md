@@ -5,18 +5,21 @@ Use `const client = require('@kyeshmz/steamworks.ts').init(appId)` in the main p
 | Area | What applications can do |
 |---|---|
 | Leaderboards | Find or create a board, upload scores and details, download ranked entries, and read board metadata. |
-| Friends | Enumerate friends, read avatars and game/lobby activity, request cached rich presence, send game invites, and handle join notifications. |
+| Friends | Enumerate friends by relationship, read avatars and game/lobby activity, request rich presence, send game invites, and handle join notifications. |
 | Input | Find action origins and glyphs, change action-set layers, read motion data, set the lightbar, open the binding panel, and trigger vibration and haptics. |
 | Lobbies | Filter by strings, numbers, slots or distance, exchange chat buffers, invite members, and change ownership, type or member limit. |
-| Networking | Use channel-based [Steam Networking Messages](networking-messages.md), connection-oriented [Steam Networking Sockets](networking-sockets.md), or legacy P2P with explicit channels. These transports are not interchangeable. |
+| Networking | Use [Steam Networking Messages](networking-messages.md), [P2P or direct-IP sockets with poll groups](networking-sockets.md), or legacy P2P with explicit channels. These transports are not interchangeable. |
+| Authentication | Start and end a [peer authentication session](auth-sessions.md). Check Steam's validation callback before granting access. |
 | Achievements and stats | Fetch global unlock percentages, localized attributes and icons, and get or set float stats. |
-| Cloud and Workshop | Read or write binary saves asynchronously, query quota, select per-file sync platforms, and read or update [Workshop metadata, tags and collection children](workshop.md). |
+| Cloud and Workshop | Read or write binary saves asynchronously, group related writes, query quota, select per-file sync platforms, and read or update [Workshop metadata, tags and collection children](workshop.md). |
 | Overlay and screenshots | Detect Big Picture and overlay availability, place notifications, hook capture requests, submit RGB pixels, import JPEGs with thumbnails, and receive completion events. |
 | Apps and DLC | Read launch parameters, list DLC, request installation or removal, and check download progress. |
 | Voice | [Capture compressed audio on request and decode received chunks to PCM](voice.md). The application controls recording, networking and playback. |
 | Inventory | [Read owned item IDs, quantities, flags, timestamps and instance properties](inventory-reads.md); load definitions and send a playtime heartbeat. Trading, purchases and signed proofs are not exposed. |
 
 `init()` reuses the process's first successful Steam client. Calling it again with a different App ID throws. Start a separate process to use another App ID. This keeps asynchronous inventory reads and their native result handles attached to the session that created them.
+
+Register `SteamInputDeviceConnected` and `SteamInputDeviceDisconnected` before calling `client.input.enableDeviceCallbacks()`. Inventory definition and full-update notifications are available through the same callback registry. Use `client.runtime.pumpStats()` to inspect pump timing; pass `true` to read and reset the counters. The runtime delivers callbacks to handlers rather than maintaining the event-drain queue used by some other bindings.
 
 ## What the checks prove
 
