@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 342" fill="none" stroke-linejoin="round">
+  <title>Two game clients connected to a dedicated server</title>
+  <defs>
+    <pattern id="grid" width="40" height="24" patternUnits="userSpaceOnUse"><path d="M0 0 40 24M0 24 40 0" stroke="#525c47" stroke-width=".6"/></pattern>
+    <pattern id="vents" width="5" height="5" patternUnits="userSpaceOnUse"><path d="M0 0V5" stroke="#a7b277" stroke-width="2"/></pattern>
+    <g id="client" stroke="#d5df99" stroke-width="1.6">
+      <path fill="#384032" d="m-52 0 75 31 38-22-74-31z"/><path fill="#242a22" d="m-52 0 75 31v7l-75-31zm75 31 38-22v7L23 38z"/>
+      <path fill="#414937" d="m-39-14 51 21 13-7-50-21z"/><path fill="#353b30" d="M-19-34v18l17 7v-18z"/>
+      <path fill="#879262" d="m-50-88 74 30 10-6-74-30z"/><path fill="#3d4837" d="m24-58 10-6v58L24 0z"/>
+      <path fill="#30382d" d="m-50-88 74 30V0l-74-30z"/><path fill="#182019" d="m-44-80 62 25v42l-62-25z"/>
+      <path d="m-35-66 8 9-8 2m13 4 14 6" stroke="#ddff62" stroke-width="3"/>
+      <path d="m-39-2 49 20m-43-24 51 21m-45-24 53 21" stroke="#939e72"/>
+    </g>
+    <g id="rack" stroke="#d5df99" stroke-width="1.6">
+      <path fill="#59634a" d="m-58-27 72 30 52-30-72-30z"/><path fill="#3c4835" d="m-58-27 72 30v26l-72-30z"/><path fill="#293126" d="m14 3 52-30v26L14 29z"/>
+      <path d="m-48-13 24 10m-24-6 24 10" stroke="#b9c78d"/><path d="m-3 7 7 3" stroke="#ddff62" stroke-width="4"/><path d="m24 7 32-18" stroke="#899770" stroke-width="3"/>
+    </g>
+  </defs>
+  <path fill="url(#grid)" d="M4 146 241 4l273 164v85l-145 87H209L4 217z"/>
+  <g stroke="#d9fb61" stroke-width="3"><path d="m126 219 62 26 84-48 66 28"/><path d="m269 196 45-26" stroke-dasharray="5 4"/></g>
+  <g fill="#d9fb61"><path d="m190 238 12 1-5 8zm79-45 12 1-5 8z"/></g>
+  <use href="#client" transform="translate(111 207)"/>
+  <use href="#rack" transform="translate(316 148)"/><use href="#rack" transform="translate(316 117)"/><use href="#rack" transform="translate(316 86)"/>
+  <path d="m288 58 43 18 26-15-43-18z" fill="url(#vents)" stroke="#bdc998"/>
+  <use href="#client" transform="translate(367 255) scale(.89)"/>
+  <g stroke="#adba82"><path d="M91 239v17H51m335 27v16h39M382 88h30l12-12"/></g>
+  <g fill="#d4debe" font-family="monospace" font-weight="bold" font-size="10" letter-spacing="1"><text x="29" y="272">CLIENT / A</text><text x="386" y="317">CLIENT / B</text><text x="388" y="66">GAME SERVER</text></g>
+</svg>

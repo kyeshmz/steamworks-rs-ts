@@ -1,30 +1,15 @@
-[![Build Status](https://github.com/kyeshmz/steamworks.ts/actions/workflows/publish.yml/badge.svg)](https://github.com/kyeshmz/steamworks.ts/actions/workflows/publish.yml)
-[![npm](https://img.shields.io/npm/v/@kyeshmz/steamworks.ts.svg)](https://npmjs.com/package/@kyeshmz/steamworks.ts)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Chat](https://img.shields.io/discord/663831597690257431?label=chat&logo=discord)](https://discord.gg/H6B7UE7fMY)
 
 # Steamworks.ts
 
-Steamworks.ts tracks [actionable upstream issues](https://github.com/kyeshmz/steamworks.ts/issues/1). It is based on [ceifa/steamworks.js](https://github.com/ceifa/steamworks.js).
+Steamworks.ts brings Steam lobbies, achievements, inventory, networking, and dedicated servers to Node.js and Electron games through one typed native module. It is based on [ceifa/steamworks.js](https://github.com/ceifa/steamworks.js).
+
+[Package website](website/) · [API reference](client.d.ts) · [Issue tracker](https://github.com/kyeshmz/steamworks.ts/issues/1)
 
 The [fork and issue audit](docs/coverage/README.md) compares implementations and lists remaining work. See [the fork feature guide](docs/fork-features.md) for the APIs available here and their verification status.
 
 The [parity ledger](docs/coverage/parity.md) tracks donor features and remaining differences across both the `steamworks.js` and `steamworks-ffi-node` networks. With the pinned source objects available, `pnpm parity:check` reproduces it locally.
-
-A modern implementation of the Steamworks SDK for HTML/JS and NodeJS based applications.
-
-## Why
-
-I used [greenworks](https://github.com/greenheartgames/greenworks) for a long time and it's great, but I gave up for the following reasons.
-
-* It's not being maintained anymore.
-* It's not up to date.
-* It's not context-aware.
-* You have to build the binaries by yourself.
-* Don't have typescript definitions.
-* The API it's not trustful.
-* The API implement callbacks instead of return flags or promises.
-* I hate C++.
 
 ## API
 
@@ -47,10 +32,14 @@ See the [TypeScript declarations](client.d.ts) for supported calls and their sig
 
 ## Installation
 
-To use steamworks.js you don't have to build anything, just install it from npm:
+Until the first npm release, build a tarball for your platform from this checkout. Install the resulting `.tgz` in your game:
 
 ```sh
-pnpm add @kyeshmz/steamworks.ts
+corepack pnpm install --frozen-lockfile
+corepack pnpm run build
+corepack pnpm pack
+# In your game directory:
+pnpm add /path/to/kyeshmz-steamworks.ts-0.4.0.tgz
 ```
 
 ### Electron
@@ -68,13 +57,11 @@ For the production build, copy the relevant distro files from `sdk/redistributab
 
 ## How to build
 
-> You **only** need to build if you are going to change something on steamworks.js code, if you are looking to just consume the library or use it in your game, refer to the [installation section](#installation).
-
-Make sure you have the latest [node.js](https://nodejs.org/en/), [Rust](https://www.rust-lang.org/tools/install) and [Clang](https://rust-lang.github.io/rust-bindgen/requirements.html). We also need [Steam](https://store.steampowered.com/about/) installed and running.
+Use [Node.js](https://nodejs.org/en/) 22.13 or newer on the 22.x line, [Rust](https://www.rust-lang.org/tools/install), and a native toolchain for your platform. You need a signed-in [Steam](https://store.steampowered.com/about/) client to exercise live client APIs.
 
 From the repository root, run `corepack enable`, `pnpm install --frozen-lockfile`, and `pnpm run build:debug` to build the library.
 
-CI builds for Linux x64, Windows x64, and both macOS architectures.
+The release workflow targets Linux x64, Windows x64, and both macOS architectures. GitHub Actions is currently disabled.
 
 ## Releases
 
