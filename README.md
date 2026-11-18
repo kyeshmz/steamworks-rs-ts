@@ -1,15 +1,24 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Chat](https://img.shields.io/discord/663831597690257431?label=chat&logo=discord)](https://discord.gg/H6B7UE7fMY)
 
 # Steamworks.ts
 
-Steamworks.ts brings Steam lobbies, achievements, inventory, networking, and dedicated servers to Node.js and Electron games through one typed native module. It is based on [ceifa/steamworks.js](https://github.com/ceifa/steamworks.js).
+**Steamworks.ts is an independently maintained fork of [ceifa/steamworks.js](https://github.com/ceifa/steamworks.js)** for Node.js and Electron games. It builds on the original Rust bindings with typed APIs for lobbies, achievements, inventory, networking, and dedicated servers.
+
+Development here continues independently after upstream activity slowed and [users asked for a maintained fork](https://github.com/ceifa/steamworks.js/issues/199). This project has its own roadmap and package name, `@kyeshmz/steamworks.ts`. It is neither an official upstream successor nor a Valve product.
 
 [Package website](website/) · [API reference](client.d.ts) · [Issue tracker](https://github.com/kyeshmz/steamworks.ts/issues/1)
 
 The [fork and issue audit](docs/coverage/README.md) compares implementations and lists remaining work. See [the fork feature guide](docs/fork-features.md) for the APIs available here and their verification status.
 
 The [parity ledger](docs/coverage/parity.md) tracks donor features and remaining differences across both the `steamworks.js` and `steamworks-ffi-node` networks. With the pinned source objects available, `pnpm parity:check` reproduces it locally.
+
+## Other Steamworks packages for JavaScript
+
+| Package | When to consider it |
+|---|---|
+| [steamworks.js](https://github.com/ceifa/steamworks.js) | The original Rust-backed Node module. Consider it if an existing game depends on the upstream `steamworks.js` package and API. |
+| [steamworks-ffi-node](https://github.com/ArtyProf/steamworks-ffi-node) | A TypeScript wrapper that calls the Steamworks SDK through Koffi FFI. Consider it if you want its manager-based API and can supply the SDK redistributables. |
+| [Greenworks](https://github.com/greenheartgames/greenworks) | A native plugin for integrating Steamworks with NW.js and Electron. Consider it when maintaining a game already built around Greenworks; check binary compatibility with your runtime version. |
 
 ## API
 
@@ -61,7 +70,18 @@ Use [Node.js](https://nodejs.org/en/) 22.13 or newer on the 22.x line, [Rust](ht
 
 From the repository root, run `corepack enable`, `pnpm install --frozen-lockfile`, and `pnpm run build:debug` to build the library.
 
-The release workflow targets Linux x64, Windows x64, and both macOS architectures. GitHub Actions is currently disabled.
+### CI coverage
+
+The [release workflow](.github/workflows/publish.yml) builds the native addon for each target and checks the **packed release tarball** in Node.js and the pinned Electron main process. On macOS, Apple Silicon and Intel have separate native build and runtime jobs. Electron asserts its platform and architecture before loading the binary.
+
+| Target | Native runner | Runtime checks |
+|---|---|---|
+| macOS Apple Silicon (arm64) | `macos-15` | Node.js + Electron |
+| macOS Intel (x64) | `macos-15-intel` | Node.js + Electron |
+| Windows x64 | `windows-latest` | Node.js + Electron |
+| Linux x64 | `ubuntu-latest` | Node.js + Electron under Xvfb |
+
+Other gates cover Rust formatting, Clippy and unit tests, strict TypeScript compilation in a clean package consumer, and offline Steam client/server fixtures on both Macs. These checks do not sign in to Steam or validate overlay rendering. GitHub Actions is currently disabled on this repository.
 
 ## Releases
 

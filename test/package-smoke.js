@@ -44,7 +44,8 @@ async function verify(root) {
     console.log(`Native package verified on ${platform}-${arch}`)
 }
 
-verify(path.resolve(process.argv[2] || '.')).catch(error => {
+module.exports = verify
+if (require.main === module) verify(path.resolve(process.argv[2] || '.')).catch(error => {
     console.error(error)
     process.exitCode = 1
 })
