@@ -5,7 +5,7 @@
         "@kyeshmz/steamworks.ts": "workspace:*"
     },
     "devDependencies": {
-        "typescript": "5.5.3"
+        "typescript": "7.0.2"
     },
     "main": "index.ts",
     "scripts": {
