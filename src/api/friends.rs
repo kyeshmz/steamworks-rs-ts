@@ -244,4 +244,89 @@ pub mod friends {
             .friends()
             .request_user_information(id, name_only.unwrap_or(true)))
     }
+
+    #[napi(object)]
+    pub struct FriendsGroup {
+        /// Signed 16-bit group ID as Steam reports it. Steam's -1 invalid marker never appears here.
+        pub id: i16,
+        pub name: String,
+    }
+
+    /// Named friends groups of the signed-in user, in Steam's order. Empty when the account has none.
+    #[napi]
+    pub fn get_friends_groups() -> Result<Vec<FriendsGroup>, Error> {
+        with_friends(|f| unsafe {
+            let count =
+                sys::SteamAPI_ISteamFriends_GetFriendsGroupCount(f).min(sys::k_cFriendsGroupLimit);
+            (0..count)
+                .filter_map(|index| {
+                    let id = sys::SteamAPI_ISteamFriends_GetFriendsGroupIDByIndex(f, index);
+                    if id == sys::k_FriendsGroupID_Invalid {
+                        return None;
+                    }
+                    let name = sys::SteamAPI_ISteamFriends_GetFriendsGroupName(f, id);
+                    (!name.is_null()).then(|| FriendsGroup {
+                        id,
+                        name: CStr::from_ptr(name).to_string_lossy().into_owned(),
+                    })
+                })
+                .collect()
+        })
+    }
+
+    // The addon's ceiling on one group read; Steam documents no per-group member maximum.
+    const MAX_GROUP_MEMBERS: i32 = 4096;
+
+    /// Member SteamID64s of one named group. IDs outside the user's groups throw; an empty group returns an empty list.
+    #[napi]
+    pub fn get_friends_group_members_list(group_id: f64) -> Result<Vec<BigInt>, Error> {
+        if group_id.fract() != 0.0
+            || !(f64::from(i16::MIN)..=f64::from(i16::MAX)).contains(&group_id)
+        {
+            return Err(Error::from_reason(
+                "Expected a signed 16-bit friends group ID",
+            ));
+        }
+        let group_id = group_id as i16;
+        // Steam documents NULL names only for invalid group IDs, so this gates the count call below.
+        let name = with_friends(|f| unsafe {
+            sys::SteamAPI_ISteamFriends_GetFriendsGroupName(f, group_id)
+        })?;
+        if name.is_null() {
+            return Err(Error::from_reason("Unknown friends group ID"));
+        }
+        let count = with_friends(|f| unsafe {
+            sys::SteamAPI_ISteamFriends_GetFriendsGroupMembersCount(f, group_id)
+        })?;
+        if count <= 0 {
+            return Ok(Vec::new());
+        }
+        if count > MAX_GROUP_MEMBERS {
+            return Err(Error::from_reason(format!(
+                "Friends group reports {} members, above the {} read limit",
+                count, MAX_GROUP_MEMBERS
+            )));
+        }
+        with_friends(|f| unsafe {
+            let mut members = vec![
+                sys::CSteamID {
+                    m_steamid: sys::CSteamID_SteamID_t { m_unAll64Bits: 0 },
+                };
+                count as usize
+            ];
+            sys::SteamAPI_ISteamFriends_GetFriendsGroupMembersList(
+                f,
+                group_id,
+                members.as_mut_ptr(),
+                count,
+            );
+            members
+                .iter()
+                .filter_map(|member| {
+                    let raw = member.m_steamid.m_unAll64Bits;
+                    (raw != 0).then(|| raw.into())
+                })
+                .collect()
+        })
+    }
 }

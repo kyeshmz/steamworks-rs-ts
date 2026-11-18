@@ -1,5 +1,12 @@
 import * as steamworks from "@kyeshmz/steamworks.ts";
 
+export async function exchangeForReceipt(client: ReturnType<typeof steamworks.init>, itemId: bigint): Promise<Buffer> {
+	const result = await client.inventory.exchangeItemsSerialized(
+		[{ definition: 1002, quantity: 1 }], [{ itemId, quantity: 3 }]
+	);
+	return result.buffer;
+}
+
 export default function main() {
 	const client = steamworks.init(480);
 	console.log(client.localplayer.getName())
@@ -8,6 +15,8 @@ export default function main() {
 		console.log(overlayVisible);
 	});
 	const friends: bigint[] = client.friends.getFriends();
+	const groupMembers: bigint[][] = client.friends.getFriendsGroups()
+		.map(group => client.friends.getFriendsGroupMembersList(group.id));
 	const board: Promise<boolean> = client.leaderboards.findLeaderboard("high-scores");
 	client.callback.register(steamworks.SteamCallback.GameRichPresenceJoinRequested, event => {
 		const invite: [bigint, string] = [event.friend_steam_id, event.connect];
@@ -22,5 +31,5 @@ export default function main() {
 	});
 	const items = client.inventory.getAllItems().then(result => result.items.map(item => item.itemId));
 	const itemIds: Promise<bigint[]> = items;
-	return { friends, board, itemIds };
+	return { friends, groupMembers, board, itemIds };
 }

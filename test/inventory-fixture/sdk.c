@@ -6,7 +6,7 @@
 #include <string.h>
 
 static atomic_int init_calls, submissions, drops;
-static int modes[32], polls[32];
+static int modes[32], kind[32], polls[32];
 static bool destroyed[32];
 static const uint64_t item_id = UINT64_MAX - 1;
 
@@ -65,6 +65,16 @@ uint32_t SteamAPI_ISteamUtils_GetAppID(void *p) { return 480; }
 void *SteamAPI_SteamInventory_v003(void) { return &init_calls; }
 
 static bool batch;
+void *SteamAPI_SteamFriends_v017(void) { return &init_calls; }
+int SteamAPI_ISteamFriends_GetFriendsGroupCount(void *p) { return 2; }
+int16_t SteamAPI_ISteamFriends_GetFriendsGroupIDByIndex(void *p, int i) { return i ? 8 : -2; }
+const char *SteamAPI_ISteamFriends_GetFriendsGroupName(void *p, int16_t id) {
+    return id == -2 ? "Party" : id == 8 ? "Empty" : NULL;
+}
+int SteamAPI_ISteamFriends_GetFriendsGroupMembersCount(void *p, int16_t id) { return id == -2 ? 2 : 0; }
+void SteamAPI_ISteamFriends_GetFriendsGroupMembersList(void *p, int16_t id, uint64_t *ids, int count) {
+    assert(id == -2 && count == 2); ids[0] = peer;
+}
 static uint32_t mask;
 void *SteamAPI_SteamRemoteStorage_v016(void) { return &mask; }
 bool SteamAPI_ISteamRemoteStorage_BeginFileWriteBatch(void *p) {
@@ -114,6 +124,39 @@ bool SteamAPI_ISteamInventory_GetItemsByID(void *p, int *handle, const uint64_t 
     modes[*handle] = *ids == item_id ? 0 : (int)*ids;
     return modes[*handle] != 3;
 }
+bool SteamAPI_ISteamInventory_SerializeResult(void *p, int h, void *buf, uint32_t *size) {
+    assert(p == &init_calls && !destroyed[h] && kind[h]);
+    if (modes[h] == 7) return false;
+    char bytes[24];
+    int len = snprintf(bytes, sizeof bytes, "receipt-%d-%d", kind[h], h);
+    assert(len > 0 && (uint32_t)len < sizeof bytes);
+    if (!buf) { *size = (uint32_t)len; return true; }
+    assert(*size == (uint32_t)len);
+    memcpy(buf, bytes, (size_t)len);
+    return true;
+}
+bool SteamAPI_ISteamInventory_ConsumeItem(void *p, int *handle, uint64_t item, uint32_t quantity) {
+    assert(p == &init_calls && quantity > 0 && item != UINT64_MAX);
+    *handle = atomic_fetch_add(&submissions, 1);
+    assert(*handle < 32);
+    kind[*handle] = 1;
+    modes[*handle] = item == item_id - 1 ? 7 : 0;
+    return item == item_id || item == item_id - 1;
+}
+bool SteamAPI_ISteamInventory_ExchangeItems(void *p, int *handle,
+        const int32_t *defs, const uint32_t *generate, uint32_t generate_len,
+        const uint64_t *items, const uint32_t *destroy, uint32_t destroy_len) {
+    assert(p == &init_calls && (generate_len || destroy_len));
+    for (uint32_t i = 0; i < generate_len; ++i) assert(generate[i] > 0);
+    for (uint32_t i = 0; i < destroy_len; ++i) assert(items[i] != UINT64_MAX && destroy[i] > 0);
+    *handle = atomic_fetch_add(&submissions, 1);
+    assert(*handle < 32);
+    kind[*handle] = 2;
+    modes[*handle] = generate_len == 2 ? 7 : 0;
+    for (uint32_t i = 0; i < destroy_len; ++i)
+        if (items[i] != item_id) return false;
+    return true;
+}
 int SteamAPI_ISteamInventory_GetResultStatus(void *p, int h) {
     assert(!destroyed[h]);
     if (!polls[h]++ || modes[h] == 5) return 22;
@@ -145,9 +188,15 @@ void SteamAPI_ISteamInventory_DestroyResult(void *p, int h) {
 }
 __attribute__((destructor)) static void verify_cleanup(void) {
     assert(atomic_load(&init_calls) == 2);
-    assert(atomic_load(&submissions) == 9);
+    assert(atomic_load(&submissions) == 16);
     assert(atomic_load(&drops) == atomic_load(&submissions));
+    int consumes = 0, exchanges = 0;
+    for (int i = 0; i < 32; ++i) {
+        consumes += kind[i] == 1;
+        exchanges += kind[i] == 2;
+    }
+    assert(consumes == 3 && exchanges == 4);
     assert(accepted == 1 && rejected == 1 && ended == 1 && freed == 2 && !active);
     fputs("auth fixture: rejected submission, accepted submission, OK then identity failure, session ended\n", stderr);
-    fputs("inventory fixture: 1 failed init, 1 successful init, 9 results destroyed\n", stderr);
+    fputs("inventory fixture: 1 failed init, 1 successful init, 2 refused and 2 unserializable mutations, 16 results destroyed\n", stderr);
 }

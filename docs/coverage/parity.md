@@ -1,6 +1,6 @@
 # What is still missing?
 
-Not all audited capabilities are exposed. For example, the inventory read APIs do not exchange items or return signed transaction receipts, and filtering friends by relationship does not list members of a named friends group. The [generated ledger](parity-ledger.md) separates reviewed gaps from spelling differences and unreviewed operations. It is not a percentage of working Steam features.
+See the [implementation plan](implementation-plan.md) for the six previously confirmed gaps. The [generated ledger](parity-ledger.md) distinguishes reviewed operations, naming differences, and entries still awaiting comparison. Matching names do not establish behavioral parity.
 
 ## What to do next
 

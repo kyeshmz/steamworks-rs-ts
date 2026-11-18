@@ -2,7 +2,7 @@ use napi_derive::napi;
 
 #[napi]
 pub mod inventory {
-    use napi::bindgen_prelude::{BigInt, Error, Result};
+    use napi::bindgen_prelude::{BigInt, Buffer, Error, Result};
     use std::collections::HashMap;
     use std::ffi::{CStr, CString};
     use std::ptr;
@@ -31,7 +31,26 @@ pub mod inventory {
         pub properties: HashMap<String, String>,
     }
 
+    #[napi(object)]
+    pub struct ExchangeGenerate {
+        pub definition: f64,
+        pub quantity: f64,
+    }
+
+    #[napi(object)]
+    pub struct ExchangeDestroy {
+        pub item_id: BigInt,
+        pub quantity: f64,
+    }
+
     struct ResultHandle(sys::SteamInventoryResult_t);
+
+    #[napi(object)]
+    pub struct SerializedResult {
+        pub timestamp: u32,
+        pub items: Vec<InventoryItem>,
+        pub buffer: Buffer,
+    }
 
     impl Drop for ResultHandle {
         fn drop(&mut self) {
@@ -45,51 +64,54 @@ pub mod inventory {
         }
     }
 
-    async fn ready(ids: Option<Vec<BigInt>>) -> Result<ResultHandle> {
-        let ids = ids
-            .map(|ids| {
-                ids.into_iter()
-                    .map(|id| match (id.sign_bit, id.words.as_slice()) {
-                        (false, []) => Ok(0),
-                        (false, [word]) => Ok(*word),
-                        _ => Err(Error::from_reason(
-                            "Inventory instance ID must be an unsigned 64-bit bigint",
-                        )),
-                    })
-                    .collect::<Result<Vec<_>>>()
-            })
-            .transpose()?;
-        let result = with_inventory(|inv| {
+    fn instance_id(value: &BigInt) -> Result<u64> {
+        match (value.sign_bit, value.words.as_slice()) {
+            (false, []) => Ok(0),
+            (false, [word]) => Ok(*word),
+            _ => Err(Error::from_reason(
+                "Inventory instance ID must be an unsigned 64-bit bigint",
+            )),
+        }
+    }
+
+    // k_SteamItemInstanceIDInvalid is all bits set, so no real item ID uses every bit.
+    fn mutation_id(value: &BigInt) -> Result<u64> {
+        match instance_id(value)? {
+            u64::MAX => Err(Error::from_reason(
+                "Inventory instance ID cannot be the Steam invalid sentinel",
+            )),
+            id => Ok(id),
+        }
+    }
+
+    fn submit(
+        request: impl FnOnce(
+            *mut sys::ISteamInventory,
+            &mut sys::SteamInventoryResult_t,
+        ) -> Result<bool>,
+    ) -> Result<ResultHandle> {
+        with_inventory(|inv| {
             let mut handle = sys::k_SteamInventoryResultInvalid;
-            let submitted = unsafe {
-                match ids {
-                    Some(ids) => sys::SteamAPI_ISteamInventory_GetItemsByID(
-                        inv,
-                        &mut handle,
-                        ids.as_ptr(),
-                        ids.len()
-                            .try_into()
-                            .map_err(|_| Error::from_reason("Too many inventory instance IDs"))?,
-                    ),
-                    None => sys::SteamAPI_ISteamInventory_GetAllItems(inv, &mut handle),
-                }
-            };
+            let submitted = request(inv, &mut handle)?;
             let result =
                 (handle != sys::k_SteamInventoryResultInvalid).then(|| ResultHandle(handle));
             result
                 .filter(|_| submitted)
                 .ok_or_else(|| Error::from_reason("Steam inventory request was not submitted"))
-        })??;
+        })?
+    }
+
+    async fn await_ready(handle: ResultHandle) -> Result<ResultHandle> {
         let deadline = Instant::now() + Duration::from_secs(30);
         loop {
             let status = unsafe {
                 sys::SteamAPI_ISteamInventory_GetResultStatus(
                     sys::SteamAPI_SteamInventory_v003(),
-                    result.0,
+                    handle.0,
                 )
             };
             match status {
-                sys::EResult::k_EResultOK => return Ok(result),
+                sys::EResult::k_EResultOK => return Ok(handle),
                 sys::EResult::k_EResultPending if Instant::now() < deadline => {
                     sleep(Duration::from_millis(50)).await
                 }
@@ -103,6 +125,32 @@ pub mod inventory {
                 }
             }
         }
+    }
+
+    async fn ready(ids: Option<Vec<BigInt>>) -> Result<ResultHandle> {
+        let ids = ids
+            .map(|ids| {
+                ids.into_iter()
+                    .map(|id| instance_id(&id))
+                    .collect::<Result<Vec<_>>>()
+            })
+            .transpose()?;
+        let handle = submit(|inv, handle| {
+            Ok(match ids {
+                Some(ids) => unsafe {
+                    sys::SteamAPI_ISteamInventory_GetItemsByID(
+                        inv,
+                        handle,
+                        ids.as_ptr(),
+                        ids.len()
+                            .try_into()
+                            .map_err(|_| Error::from_reason("Too many inventory instance IDs"))?,
+                    )
+                },
+                None => unsafe { sys::SteamAPI_ISteamInventory_GetAllItems(inv, handle) },
+            })
+        })?;
+        await_ready(handle).await
     }
 
     impl ResultHandle {
@@ -189,6 +237,24 @@ pub mod inventory {
                 })
                 .collect()
         }
+
+        fn receipt(&self) -> Result<SerializedResult> {
+            let bytes = read_array(0u8, |data, size| unsafe {
+                sys::SteamAPI_ISteamInventory_SerializeResult(
+                    sys::SteamAPI_SteamInventory_v003(),
+                    self.0,
+                    data.cast(),
+                    size,
+                )
+            })
+            .ok_or_else(|| Error::from_reason("Could not serialize the inventory result"))?;
+            let snapshot = self.snapshot()?;
+            Ok(SerializedResult {
+                timestamp: snapshot.timestamp,
+                items: snapshot.items,
+                buffer: Buffer::from(bytes),
+            })
+        }
     }
 
     #[napi]
@@ -214,6 +280,118 @@ pub mod inventory {
     #[napi]
     pub async fn get_all_item_properties() -> Result<Vec<ItemProperties>> {
         ready(None).await?.properties()
+    }
+
+    struct ExchangePlan {
+        definitions: Vec<i32>,
+        generate_quantities: Vec<u32>,
+        ids: Vec<u64>,
+        destroy_quantities: Vec<u32>,
+    }
+
+    fn checked_quantity(value: f64) -> Result<u32> {
+        if value.fract() == 0.0 && (1.0..=f64::from(u32::MAX)).contains(&value) {
+            Ok(value as u32)
+        } else {
+            Err(Error::from_reason(
+                "Quantity must be an unsigned 32-bit integer greater than zero",
+            ))
+        }
+    }
+
+    impl ExchangePlan {
+        fn parse(generate: Vec<ExchangeGenerate>, destroy: Vec<ExchangeDestroy>) -> Result<Self> {
+            if generate.is_empty() && destroy.is_empty() {
+                return Err(Error::from_reason(
+                    "Exchange needs at least one generated definition or destroyed item",
+                ));
+            }
+            for entry in &generate {
+                if entry.definition.fract() != 0.0
+                    || !(1.0..=f64::from(i32::MAX)).contains(&entry.definition)
+                {
+                    return Err(Error::from_reason(
+                        "Expected a positive 32-bit item definition",
+                    ));
+                }
+            }
+            let mut ids = Vec::with_capacity(destroy.len());
+            for entry in &destroy {
+                ids.push(mutation_id(&entry.item_id)?);
+            }
+            Ok(ExchangePlan {
+                definitions: generate
+                    .iter()
+                    .map(|entry| entry.definition as i32)
+                    .collect(),
+                generate_quantities: generate
+                    .iter()
+                    .map(|entry| checked_quantity(entry.quantity))
+                    .collect::<Result<_>>()?,
+                ids,
+                destroy_quantities: destroy
+                    .iter()
+                    .map(|entry| checked_quantity(entry.quantity))
+                    .collect::<Result<_>>()?,
+            })
+        }
+    }
+
+    fn submit_exchange(plan: &ExchangePlan) -> Result<ResultHandle> {
+        submit(|inv, handle| {
+            let generate_len = u32::try_from(plan.definitions.len())
+                .map_err(|_| Error::from_reason("Too many items in one exchange"))?;
+            let destroy_len = u32::try_from(plan.ids.len())
+                .map_err(|_| Error::from_reason("Too many items in one exchange"))?;
+            Ok(unsafe {
+                sys::SteamAPI_ISteamInventory_ExchangeItems(
+                    inv,
+                    handle,
+                    plan.definitions.as_ptr(),
+                    plan.generate_quantities.as_ptr(),
+                    generate_len,
+                    plan.ids.as_ptr(),
+                    plan.destroy_quantities.as_ptr(),
+                    destroy_len,
+                )
+            })
+        })
+    }
+
+    /// Exchanges item quantities in one atomic Steam transaction and returns the resulting snapshot.
+    #[napi]
+    pub async fn exchange_items(
+        generate: Vec<ExchangeGenerate>,
+        destroy: Vec<ExchangeDestroy>,
+    ) -> Result<InventoryResult> {
+        let plan = ExchangePlan::parse(generate, destroy)?;
+        let handle = submit_exchange(&plan)?;
+        await_ready(handle).await?.snapshot()
+    }
+
+    /// Consumes item quantity permanently and returns the Steam-signed receipt bytes.
+    #[napi]
+    pub async fn consume_item_serialized(
+        item_id: BigInt,
+        quantity: f64,
+    ) -> Result<SerializedResult> {
+        let item = mutation_id(&item_id)?;
+        let quantity = checked_quantity(quantity)?;
+        let handle = submit(|inv, out| {
+            Ok(unsafe { sys::SteamAPI_ISteamInventory_ConsumeItem(inv, out, item, quantity) })
+        })?;
+        await_ready(handle).await?.receipt()
+    }
+
+    /// Exchanges items in one atomic Steam transaction and returns the Steam-signed receipt bytes.
+    #[napi]
+    pub async fn exchange_items_serialized(
+        generate: Vec<ExchangeGenerate>,
+        destroy: Vec<ExchangeDestroy>,
+    ) -> Result<SerializedResult> {
+        let plan = ExchangePlan::parse(generate, destroy)?;
+        let handle = submit_exchange(&plan)?;
+        await_ready(handle).await?.receipt()
     }
 
     fn with_inventory<T>(read: impl FnOnce(*mut sys::ISteamInventory) -> T) -> Result<T> {

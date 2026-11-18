@@ -27,7 +27,12 @@ async function run() {
     Atomics.store(gate, 0, 1)
     Atomics.notify(gate, 0)
     await initialized
-    const { inventory, auth, callback, cloud, voice, runtime } = steam.init()
+    const { inventory, auth, callback, cloud, voice, runtime, friends } = steam.init()
+    assert.deepEqual(friends.getFriendsGroups(), [{ id: -2, name: 'Party' }, { id: 8, name: 'Empty' }])
+    assert.deepEqual(friends.getFriendsGroupMembersList(-2), [76561197960265729n])
+    assert.deepEqual(friends.getFriendsGroupMembersList(8), [])
+    assert.throws(() => friends.getFriendsGroupMembersList(-1), /Unknown friends group/)
+    assert.throws(() => friends.getFriendsGroupMembersList(65534), /16-bit/)
     assert.throws(() => steam.gameServer.init({
         bindIp: '127.0.0.1', gamePort: 27015, queryPort: 27016,
         mode: steam.gameServer.Mode.Authentication, version: '1', product: 'test', description: 'test',
@@ -83,4 +88,35 @@ async function run() {
     await assert.rejects(inventory.getItemsByID([3n]), /not submitted/)
     await assert.rejects(inventory.getItemProperties([4n]), /read inventory item property/)
     await assert.rejects(inventory.getItemsByID([5n]), /timed out/)
+    const exchanged = { timestamp: 1234, items: [item] }
+    assert.deepEqual(
+        await inventory.exchangeItems([{ definition: 8, quantity: 1 }], [{ itemId, quantity: 2 }]),
+        exchanged,
+    )
+    assert.deepEqual(
+        await inventory.exchangeItemsSerialized([{ definition: 8, quantity: 1 }], [{ itemId, quantity: 1 }]),
+        { ...exchanged, buffer: Buffer.from('receipt-2-10') },
+    )
+    assert.deepEqual(await inventory.consumeItemSerialized(itemId, 2), { ...exchanged, buffer: Buffer.from('receipt-1-11') })
+    await assert.rejects(inventory.consumeItemSerialized(itemId - 1n, 1), /Could not serialize/)
+    await assert.rejects(
+        inventory.exchangeItemsSerialized([{ definition: 8, quantity: 1 }, { definition: 8, quantity: 1 }], []),
+        /Could not serialize/,
+    )
+    await assert.rejects(inventory.consumeItemSerialized(1n, 1), /not submitted/)
+    await assert.rejects(
+        inventory.exchangeItemsSerialized([{ definition: 8, quantity: 1 }], [{ itemId: 1n, quantity: 1 }]),
+        /not submitted/,
+    )
+    await assert.rejects(inventory.consumeItemSerialized(-1n, 1), /unsigned 64-bit/)
+    await assert.rejects(inventory.consumeItemSerialized(1n << 64n, 1), /unsigned 64-bit/)
+    await assert.rejects(inventory.consumeItemSerialized(itemId + 1n, 1), /sentinel/)
+    await assert.rejects(inventory.consumeItemSerialized(itemId, 0), /greater than zero/)
+    for (const invalid of [-1, 1.5, 4294967297, NaN]) {
+        await assert.rejects(inventory.consumeItemSerialized(itemId, invalid), /greater than zero/)
+    }
+    await assert.rejects(inventory.exchangeItems([], []), /at least one/)
+    await assert.rejects(inventory.exchangeItemsSerialized([{ definition: 8, quantity: 0 }], []), /greater than zero/)
+    await assert.rejects(inventory.exchangeItemsSerialized([], [{ itemId: itemId + 1n, quantity: 1 }]), /sentinel/)
+    await assert.rejects(inventory.exchangeItemsSerialized([], [{ itemId: -1n, quantity: 1 }]), /unsigned 64-bit/)
 }

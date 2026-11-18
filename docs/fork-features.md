@@ -5,7 +5,7 @@ Use `const client = require('@kyeshmz/steamworks.ts').init(appId)` in the main p
 | Area | What applications can do |
 |---|---|
 | Leaderboards | Find or create a board, upload scores and details, download ranked entries, and read board metadata. |
-| Friends | Enumerate friends by relationship, read avatars and game/lobby activity, request rich presence, send game invites, and handle join notifications. |
+| Friends | Enumerate friends by relationship or [named group](friends-groups.md), read avatars and game/lobby activity, request rich presence, send game invites, and handle join notifications. |
 | Input | Find action origins and glyphs, change action-set layers, read motion data, set the lightbar, open the binding panel, and trigger vibration and haptics. |
 | Lobbies | Filter by strings, numbers, slots or distance, exchange chat buffers, invite members, and change ownership, type or member limit. |
 | Networking | Use [Steam Networking Messages](networking-messages.md), [P2P or direct-IP sockets with poll groups](networking-sockets.md), or legacy P2P with explicit channels. These transports are not interchangeable. |
@@ -16,7 +16,7 @@ Use `const client = require('@kyeshmz/steamworks.ts').init(appId)` in the main p
 | Overlay and screenshots | Detect Big Picture and overlay availability, place notifications, hook capture requests, submit RGB pixels, import JPEGs with thumbnails, and receive completion events. |
 | Apps and DLC | Read launch parameters, list DLC, request installation or removal, and check download progress. |
 | Voice | [Capture compressed audio on request and decode received chunks to PCM](voice.md). The application controls recording, networking and playback. |
-| Inventory | [Read owned item IDs, quantities, flags, timestamps and instance properties](inventory-reads.md); load definitions and send a playtime heartbeat. Trading, purchases and signed proofs are not exposed. |
+| Inventory | [Read items, exchange them according to a Steam recipe, and get serialized consume or exchange receipts](inventory-reads.md). Trading and purchases are separate operations. |
 
 `init()` reuses the process's first successful Steam client. Calling it again with a different App ID throws. Start a separate process to use another App ID. This keeps asynchronous inventory reads and their native result handles attached to the session that created them.
 

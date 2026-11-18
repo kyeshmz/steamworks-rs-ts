@@ -188,6 +188,15 @@ export declare namespace friends {
   export function getPersona(steamId64: bigint): Persona
   /** Defaults to name only. True when Steam started a fetch; false when cached. */
   export function requestUserInformation(steamId64: bigint, nameOnly?: boolean | undefined | null): boolean
+  export interface FriendsGroup {
+    /** Signed 16-bit group ID as Steam reports it. Steam's -1 invalid marker never appears here. */
+    id: number
+    name: string
+  }
+  /** Named friends groups of the signed-in user, in Steam's order. Empty when the account has none. */
+  export function getFriendsGroups(): Array<FriendsGroup>
+  /** Member SteamID64s of one named group. IDs outside the user's groups throw; an empty group returns an empty list. */
+  export function getFriendsGroupMembersList(groupId: number): Array<bigint>
 }
 export declare namespace game_server {
   export const enum Mode {
@@ -329,11 +338,30 @@ export declare namespace inventory {
     quantity: number
     properties: Record<string, string>
   }
+  export interface ExchangeGenerate {
+    definition: number
+    quantity: number
+  }
+  export interface ExchangeDestroy {
+    itemId: bigint
+    quantity: number
+  }
+  export interface SerializedResult {
+    timestamp: number
+    items: Array<InventoryItem>
+    buffer: Buffer
+  }
   export function getAllItems(): Promise<InventoryResult>
   export function getItemsById(itemIds: Array<bigint>): Promise<InventoryResult>
   export function getItemsByID(itemIds: Array<bigint>): Promise<InventoryResult>
   export function getItemProperties(itemIds: Array<bigint>): Promise<Array<ItemProperties>>
   export function getAllItemProperties(): Promise<Array<ItemProperties>>
+  /** Exchanges item quantities in one atomic Steam transaction and returns the resulting snapshot. */
+  export function exchangeItems(generate: Array<ExchangeGenerate>, destroy: Array<ExchangeDestroy>): Promise<InventoryResult>
+  /** Consumes item quantity permanently and returns the Steam-signed receipt bytes. */
+  export function consumeItemSerialized(itemId: bigint, quantity: number): Promise<SerializedResult>
+  /** Exchanges items in one atomic Steam transaction and returns the Steam-signed receipt bytes. */
+  export function exchangeItemsSerialized(generate: Array<ExchangeGenerate>, destroy: Array<ExchangeDestroy>): Promise<SerializedResult>
   /** Requests a refresh. A successful request does not mean definitions are ready. */
   export function loadItemDefinitions(): boolean
   /** Returns the cached definition IDs, or null if Steam could not read them. */
