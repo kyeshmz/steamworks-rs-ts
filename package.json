@@ -1,6 +1,7 @@
 {
     "name": "steamworks.js",
     "version": "0.4.0",
+    "packageManager": "pnpm@10.34.0",
     "main": "index.js",
     "types": "index.d.ts",
     "napi": {
@@ -28,13 +29,13 @@
         "typescript": "5.5.3"
     },
     "dependencies": {
-        "@types/node": "*"
+        "@types/node": "20.14.0"
     },
     "engines": {
         "node": ">= 14"
     },
     "scripts": {
-        "build": "npm run types && node build --release",
+        "build": "pnpm run types && node build --release",
         "build:debug": "node build",
         "prune": "rimraf dist target client.d.ts",
         "format": "cargo clippy --fix --allow-staged && cargo fmt",

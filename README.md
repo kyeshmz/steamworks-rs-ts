@@ -1,9 +1,11 @@
-[![Build Status](https://github.com/ceifa/steamworks.js/actions/workflows/publish.yml/badge.svg)](https://github.com/ceifa/steamworks.js/actions/workflows/publish.yml)
+[![Build Status](https://github.com/kyeshmz/steamworks.js/actions/workflows/publish.yml/badge.svg)](https://github.com/kyeshmz/steamworks.js/actions/workflows/publish.yml)
 [![npm](https://img.shields.io/npm/v/steamworks.js.svg)](https://npmjs.com/package/steamworks.js)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Chat](https://img.shields.io/discord/663831597690257431?label=chat&logo=discord)](https://discord.gg/H6B7UE7fMY)
 
 # Steamworks.js
+
+This fork tracks [actionable upstream issues](https://github.com/kyeshmz/steamworks.js/issues/1). The `steamworks.js` package on npm is the upstream release.
 
 A modern implementation of the Steamworks SDK for HTML/JS and NodeJS based applications.
 
@@ -77,12 +79,12 @@ For the production build, copy the relevant distro files from `sdk/redistributab
 
 Make sure you have the latest [node.js](https://nodejs.org/en/), [Rust](https://www.rust-lang.org/tools/install) and [Clang](https://rust-lang.github.io/rust-bindgen/requirements.html). We also need [Steam](https://store.steampowered.com/about/) installed and running.
 
-Install dependencies with `npm install` and then run `npm run build:debug` to build the library.
+From the repository root, run `corepack enable`, `pnpm install --frozen-lockfile`, and `pnpm run build:debug` to build the library.
 
 There is no way to build for all targets easily. The good news is that you don't need to. You can develop and test on your current target, and open a PR. When the code is merged to main, a github action will build for all targets and publish a new version.
 
 ### Testing Electron
 
-Go to the [test/electron](./test/electron) directory. There, you can run `npm install` and then `npm start` to run the Electron app.
+After building, run `pnpm --dir test/electron start` to launch the [Electron example](./test/electron).
 
 Click "activate overlay" to test the overlay.

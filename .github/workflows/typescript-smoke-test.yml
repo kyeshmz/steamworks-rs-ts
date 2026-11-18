@@ -1,19 +1,23 @@
 name: TypeScript Smoke Test
 on:
     push:
+    pull_request:
+permissions:
+    contents: read
 jobs:
     test:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
                   node-version: 22.x
+                  cache: pnpm
 
-            - name: Install NPM dependencies
-              run: npm install && cd test/typescript && npm install
+            - run: pnpm install --frozen-lockfile
 
             - name: Compile TypeScript sources
-              run: cd test/typescript && npm run compile
+              run: pnpm --dir test/typescript run compile

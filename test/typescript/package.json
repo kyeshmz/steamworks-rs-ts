@@ -2,10 +2,10 @@
     "name": "steamworks.js-typescript-test",
     "private": true,
     "dependencies": {
-        "steamworks.js": "../.."
+        "steamworks.js": "workspace:*"
     },
     "devDependencies": {
-        "typescript": "4.7.4"
+        "typescript": "5.5.3"
     },
     "main": "index.ts",
     "scripts": {
