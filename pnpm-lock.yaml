@@ -27,7 +27,7 @@ importers:
 
   test/electron:
     dependencies:
-      '@kyeshmz/steamworks.js':
+      '@kyeshmz/steamworks.ts':
         specifier: workspace:*
         version: link:../..
     devDependencies:
@@ -40,7 +40,7 @@ importers:
 
   test/typescript:
     dependencies:
-      '@kyeshmz/steamworks.js':
+      '@kyeshmz/steamworks.ts':
         specifier: workspace:*
         version: link:../..
     devDependencies:

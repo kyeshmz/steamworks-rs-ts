@@ -1,4 +1,4 @@
-import * as steamworks from "@kyeshmz/steamworks.js";
+import * as steamworks from "@kyeshmz/steamworks.ts";
 
 export default function main() {
 	const client = steamworks.init(480);

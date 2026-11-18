@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('node:path')
-const steamworks = require('@kyeshmz/steamworks.js')
+const steamworks = require('@kyeshmz/steamworks.ts')
 
 function createWindow() {
     const mainWindow = new BrowserWindow({

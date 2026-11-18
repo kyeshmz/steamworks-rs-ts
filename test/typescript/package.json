@@ -2,7 +2,7 @@
     "name": "steamworks.js-typescript-test",
     "private": true,
     "dependencies": {
-        "@kyeshmz/steamworks.js": "workspace:*"
+        "@kyeshmz/steamworks.ts": "workspace:*"
     },
     "devDependencies": {
         "typescript": "5.5.3"

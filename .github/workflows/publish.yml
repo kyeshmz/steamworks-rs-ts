@@ -245,9 +245,9 @@ jobs:
               run: |
                   gh release download "$TAG" --pattern '*.tgz' --repo "$GITHUB_REPOSITORY"
                   tar -xOzf ./*.tgz package/package.json > manifest.json
-                  node -e "const p = require('./manifest.json'); if (p.name !== '@kyeshmz/steamworks.js' || 'v' + p.version !== process.env.TAG) process.exit(1)"
+                  node -e "const p = require('./manifest.json'); if (p.name !== '@kyeshmz/steamworks.ts' || 'v' + p.version !== process.env.TAG) process.exit(1)"
                   status=$(curl --silent --show-error -o registry.json -w '%{http_code}' \
-                      "https://registry.npmjs.org/@kyeshmz%2fsteamworks.js/${TAG#v}")
+                      "https://registry.npmjs.org/@kyeshmz%2fsteamworks.ts/${TAG#v}")
                   case "$status" in
                     404) npm publish ./*.tgz --access public --provenance ;;
                     200) expected="sha512-$(openssl dgst -sha512 -binary ./*.tgz | openssl base64 -A)"

@@ -1,6 +1,6 @@
 # Fork features
 
-Use `const client = require('@kyeshmz/steamworks.js').init(appId)` in the main process. The [declarations](../client.d.ts) list all public methods and parameter types.
+Use `const client = require('@kyeshmz/steamworks.ts').init(appId)` in the main process. The [declarations](../client.d.ts) list all public methods and parameter types.
 
 | Area | What applications can do |
 |---|---|
