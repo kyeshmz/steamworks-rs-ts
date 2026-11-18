@@ -1,5 +1,7 @@
 # What to adopt from upstream Steamworks.js
 
+For the current package comparison, see [API parity](parity.md). The historical snapshot below compares donors against upstream before those changes were integrated here.
+
 Start with the package users install. Then port small bindings onto that package, one API at a time. Do not replace this fork with the most active default branch. For example, the inventory PR changes the SDK binaries as well as the API, while the two leaderboard PRs offer different names for the same operations.
 
 This is a decision record against [upstream `80c5fd7`](https://github.com/ceifa/steamworks.js/commit/80c5fd7c4958ba90cf87403c3f967b8a6d748473), not a list of features shipped by this fork. Check the current `src`, `client.d.ts`, and packed module before implementing any row.

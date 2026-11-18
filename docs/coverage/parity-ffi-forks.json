@@ -1,0 +1,15 @@
+{
+  "upstream": "f5ce2b7dc194672ed45f7352c9e325d12451028f",
+  "forks": [
+    ["batureren/steamworks-ffi-node", "main", "656d89dfbcd191602f4fe50d1a995213522e3753"],
+    ["GeorgeGkas/steamworks-ffi-node", "main", "656d89dfbcd191602f4fe50d1a995213522e3753"],
+    ["openfrontio/steamworks-ffi-node", "main", "a9e59f19040133f906d0148d3f495077092a898d"],
+    ["Stanko/steamworks-ffi-node", "main", "930bbe61afabac7800f9a4408d72a74aeec8f587"],
+    ["jasonfrasch/steamworks-ffi-node", "main", "930bbe61afabac7800f9a4408d72a74aeec8f587"],
+    ["Rojoss/steamworks-ffi-node", "main", "930bbe61afabac7800f9a4408d72a74aeec8f587"],
+    ["FurryGoods/steamworks-ffi-node", "main", "f5ce2b7dc194672ed45f7352c9e325d12451028f"],
+    ["kiranipiebox/steamworks-ffi-node", "main", "83786f1d62708d63312a1aa588a8223e9a12aabb"],
+    ["markharrison/steamworks-ffi-node", "main", "6739db408faeeca1cb5f8a4062f9c0d04adce78c"],
+    ["lineCode/steamworks-ffi-node", "main", "7c0932e4d40217d9bc7095e863ca471db3bedd3e"]
+  ]
+}

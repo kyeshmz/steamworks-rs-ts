@@ -36,6 +36,9 @@
         "node": ">= 14"
     },
     "scripts": {
+        "parity:check": "python3 scripts/audit-upstream.py --check && node scripts/audit-parity.cjs --check",
+        "parity:report": "node scripts/audit-parity.cjs",
+        "test:bindings": "tsc --strict --noEmit test/typescript/index.ts && node test/package-smoke.js && node test/networking-sockets.js",
         "build": "node build --release",
         "build:debug": "node build",
         "prune": "rimraf dist target client.d.ts",

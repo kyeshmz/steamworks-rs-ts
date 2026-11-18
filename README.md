@@ -9,6 +9,8 @@ Steamworks.ts tracks [actionable upstream issues](https://github.com/kyeshmz/ste
 
 The [fork and issue audit](docs/coverage/README.md) compares implementations and lists remaining work. See [the fork feature guide](docs/fork-features.md) for the APIs available here and their verification status.
 
+The [parity ledger](docs/coverage/parity.md) tracks donor features and remaining differences across both the `steamworks.js` and `steamworks-ffi-node` networks. With the pinned source objects available, `pnpm parity:check` reproduces it locally.
+
 A modern implementation of the Steamworks SDK for HTML/JS and NodeJS based applications.
 
 ## Why
