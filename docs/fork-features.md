@@ -9,6 +9,7 @@ Use `const client = require('@kyeshmz/steamworks.ts').init(appId)` in the main p
 | Input | Find action origins and glyphs, change action-set layers, read motion data, set the lightbar, open the binding panel, and trigger vibration and haptics. |
 | Lobbies | Filter by strings, numbers, slots or distance, exchange chat buffers, invite members, and change ownership, type or member limit. |
 | Networking | Use [Steam Networking Messages](networking-messages.md), [P2P or direct-IP sockets with poll groups](networking-sockets.md), or legacy P2P with explicit channels. These transports are not interchangeable. |
+| Dedicated server | Use the package's separate [`gameServer` entry point](game-server.md) to initialize a server, update its listing, pump callbacks, check connection state and shut down. |
 | Authentication | Start and end a [peer authentication session](auth-sessions.md). Check Steam's validation callback before granting access. |
 | Achievements and stats | Fetch global unlock percentages, localized attributes and icons, and get or set float stats. |
 | Cloud and Workshop | Read or write binary saves asynchronously, group related writes, query quota, select per-file sync platforms, and read or update [Workshop metadata, tags and collection children](workshop.md). |

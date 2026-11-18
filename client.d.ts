@@ -189,6 +189,47 @@ export declare namespace friends {
   /** Defaults to name only. True when Steam started a fetch; false when cached. */
   export function requestUserInformation(steamId64: bigint, nameOnly?: boolean | undefined | null): boolean
 }
+export declare namespace game_server {
+  export const enum Mode {
+    NoAuthentication = 'NoAuthentication',
+    Authentication = 'Authentication',
+    AuthenticationAndSecure = 'AuthenticationAndSecure'
+  }
+  export const enum ConnectionState {
+    Ready = 'Ready',
+    Connecting = 'Connecting',
+    Connected = 'Connected',
+    Failed = 'Failed',
+    Disconnected = 'Disconnected'
+  }
+  export interface ServerListing {
+    serverName: string
+    mapName: string
+    maxPlayers: number
+  }
+  export interface ServerOptions {
+    bindIp: string
+    gamePort: number
+    queryPort: number
+    mode: Mode
+    version: string
+    product: string
+    description: string
+    listing: ServerListing
+  }
+  export interface ServerStatus {
+    state: ConnectionState
+    steamId?: bigint
+  }
+  export function init(options: ServerOptions): void
+  export function updateListing(listing: ServerListing): void
+  export function setAdvertising(active: boolean): void
+  export function logOn(token: string): void
+  export function logOnAnonymous(): void
+  export function status(): ServerStatus
+  export function runCallbacks(): void
+  export function shutdown(): boolean
+}
 export declare namespace input {
   export const enum GlyphSize {
     Small = 0,

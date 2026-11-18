@@ -3,13 +3,14 @@ use napi_derive::napi;
 use steamworks::AppId;
 
 pub mod client;
+mod process_mode;
 
 #[macro_use]
 extern crate lazy_static;
 
 #[napi]
 pub fn init(app_id: Option<u32>) -> Result<(), Error> {
-    client::init(app_id)
+    process_mode::initialize(process_mode::Mode::Client, || client::init(app_id))
 }
 
 #[napi]

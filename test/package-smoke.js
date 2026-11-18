@@ -3,6 +3,7 @@ const path = require('node:path')
 
 async function verify(root) {
     const sdk = require(root)
+    assert.throws(() => sdk.gameServer.status(), /not initialized/)
     assert.equal(sdk.SteamCallback.PersonaStateChange, 0)
     assert.equal(sdk.SteamCallback.GameOverlayActivated, 10)
 

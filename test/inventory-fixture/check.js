@@ -28,6 +28,11 @@ async function run() {
     Atomics.notify(gate, 0)
     await initialized
     const { inventory, auth, callback, cloud, voice, runtime } = steam.init()
+    assert.throws(() => steam.gameServer.init({
+        bindIp: '127.0.0.1', gamePort: 27015, queryPort: 27016,
+        mode: steam.gameServer.Mode.Authentication, version: '1', product: 'test', description: 'test',
+        listing: { serverName: 'test', mapName: 'test', maxPlayers: 2 },
+    }), /separate processes/)
     assert.equal(cloud.beginFileWriteBatch(), true)
     assert.equal(cloud.beginFileWriteBatch(), false)
     for (const mask of [9, 0xffffffff]) {

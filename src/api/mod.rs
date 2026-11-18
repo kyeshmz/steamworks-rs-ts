@@ -4,6 +4,7 @@ pub mod auth;
 pub mod callback;
 pub mod cloud;
 pub mod friends;
+pub mod game_server;
 pub mod input;
 pub mod inventory;
 pub mod leaderboards;
