@@ -11,8 +11,32 @@ export declare namespace achievement {
   export function isActivated(achievement: string): boolean
   export function clear(achievement: string): boolean
   export function names(): Array<string>
+  /** Use "name", "desc", or "hidden". The hidden flag is "0" or "1". */
+  export function getDisplayAttribute(achievement: string, key: string): string | null
+  /** Returns a 64x64 RGBA buffer, or null if the icon is unavailable. */
+  export function getIcon(achievement: string): Buffer | null
+  /** Wait for Steam's global percentage request before reading individual achievements. */
+  export function requestGlobalPercentages(): Promise<void>
+  /** Returns the cached unlock percentage (0-100), or null if Steam has no data. */
+  export function getAchievedPercent(achievement: string): number | null
 }
 export declare namespace apps {
+  export interface DlcInfo {
+    appId: number
+    available: boolean
+    name: string
+  }
+  export function listDlc(): Array<DlcInfo>
+  /** Starts a background download for an owned DLC. */
+  export function installDlc(appId: number): void
+  export function uninstallDlc(appId: number): void
+  export interface DlcDownloadProgress {
+    bytesDownloaded: bigint
+    bytesTotal: bigint
+  }
+  export function getDlcDownloadProgress(appId: number): DlcDownloadProgress | null
+  export function launchQueryParam(key: string): string
+  export function launchCommandLine(): string
   export function isSubscribedApp(appId: number): boolean
   export function isAppInstalled(appId: number): boolean
   export function isDlcInstalled(appId: number): boolean
@@ -56,7 +80,9 @@ export declare namespace callback {
     P2PSessionRequest = 6,
     P2PSessionConnectFail = 7,
     GameLobbyJoinRequested = 8,
-    MicroTxnAuthorizationResponse = 9
+    MicroTxnAuthorizationResponse = 9,
+    GameOverlayActivated = 10,
+    LobbyChatMsg = 11
   }
   export function register<C extends keyof import('./callbacks').CallbackReturns>(steamCallback: C, handler: (value: import('./callbacks').CallbackReturns[C]) => void): Handle
   export class Handle {
@@ -71,13 +97,49 @@ export declare namespace cloud {
   export function writeFile(name: string, content: string): boolean
   export function deleteFile(name: string): boolean
   export function fileExists(name: string): boolean
+  export function isFilePersisted(name: string): boolean
+  export function fileTimestamp(name: string): number
+  /** Read binary save data without blocking the Node event loop. */
+  export function readFileBytes(name: string): Promise<Buffer>
+  export function writeFileBytes(name: string, data: Buffer): Promise<void>
   export function listFiles(): Array<FileInfo>
   export class FileInfo {
     name: string
     size: bigint
   }
 }
+export declare namespace friends {
+  export interface Persona {
+    name: string
+    state: string
+    /** 64 x 64 RGBA bytes when Steam has an avatar available. */
+    mediumAvatar?: Buffer
+  }
+  /** Returns the IDs of immediate friends, excluding pending invitations. */
+  export function getFriends(): Array<bigint>
+  export function getPersonaName(steamId64: bigint): string
+  export const enum AvatarSize {
+    Small = 0,
+    Medium = 1,
+    Large = 2
+  }
+  /** RGBA pixels at 32x32, 64x64, or 184x184. Returns null when unavailable. */
+  export function getAvatar(steamId64: bigint, size: AvatarSize): Buffer | null
+  export function getPersona(steamId64: bigint): Persona
+  /** Defaults to name only. True when Steam started a fetch; false when cached. */
+  export function requestUserInformation(steamId64: bigint, nameOnly?: boolean | undefined | null): boolean
+}
 export declare namespace input {
+  export const enum GlyphSize {
+    Small = 0,
+    Medium = 1,
+    Large = 2
+  }
+  export const enum HapticLocation {
+    Left = 0,
+    Right = 1,
+    Both = 2
+  }
   export const enum InputType {
     Unknown = 'Unknown',
     SteamController = 'SteamController',
@@ -104,6 +166,12 @@ export declare namespace input {
   export function getActionSet(actionSetName: string): bigint
   export function getDigitalAction(actionName: string): bigint
   export function getAnalogAction(actionName: string): bigint
+  export function getGlyphForActionOrigin(origin: number): string
+  export function getGlyphPngForActionOrigin(origin: number, size: GlyphSize, flags?: number | undefined | null): string
+  export function getGlyphSvgForActionOrigin(origin: number, flags?: number | undefined | null): string
+  export function getStringForActionOrigin(origin: number): string
+  export function setInputActionManifestFilePath(path: string): boolean
+  export function runFrame(): void
   export function shutdown(): void
   export class Controller {
     activateActionSet(actionSetHandle: bigint): void
@@ -111,12 +179,87 @@ export declare namespace input {
     getAnalogActionVector(actionHandle: bigint): AnalogActionVector
     getType(): InputType
     getHandle(): bigint
+    getDigitalActionOrigins(actionSet: bigint, action: bigint): Array<number>
+    getAnalogActionOrigins(actionSet: bigint, action: bigint): Array<number>
+    showBindingPanel(): boolean
+    getCurrentActionSet(): bigint
+    activateActionSetLayer(layer: bigint): void
+    deactivateActionSetLayer(layer: bigint): void
+    deactivateAllActionSetLayers(): void
+    getActiveActionSetLayers(): Array<bigint>
+    /** Motor speeds range from 0 (stop) to 65535. */
+    triggerVibration(leftSpeed: number, rightSpeed: number): void
+    /** Send a haptic pulse on Steam Deck or Steam Controller. */
+    triggerSimpleHapticEvent(location: HapticLocation, intensity: number, gainDb: number, otherIntensity: number, otherGainDb: number): void
   }
+}
+export declare namespace inventory {
+  /** Requests a refresh. A successful request does not mean definitions are ready. */
+  export function loadItemDefinitions(): boolean
+  /** Returns the cached definition IDs, or null if Steam could not read them. */
+  export function getItemDefinitionIds(): Array<number> | null
+  /** Omit name to read the comma-separated property names. Missing properties return null. */
+  export function getItemDefinitionProperty(definition: number, name?: string | undefined | null): string | null
+  /** Records play time for playtime-based item drops. Does not grant an item. */
+  export function sendItemDropHeartbeat(): void
+}
+export declare namespace leaderboards {
+  export const enum LeaderboardSortMethod {
+    Ascending = 0,
+    Descending = 1
+  }
+  export const enum LeaderboardDisplayType {
+    Numeric = 0,
+    TimeSeconds = 1,
+    TimeMilliSeconds = 2
+  }
+  export const enum LeaderboardDataRequest {
+    Global = 0,
+    GlobalAroundUser = 1,
+    Friends = 2
+  }
+  export const enum UploadScoreMethod {
+    KeepBest = 0,
+    ForceUpdate = 1
+  }
+  export interface LeaderboardEntry {
+    /** SteamId64 of the entry's owner. */
+    steamId: bigint
+    /** 1-indexed global rank. */
+    globalRank: number
+    score: number
+    /** Game-defined metadata attached at upload (up to 64 i32s). */
+    details: Array<number>
+  }
+  export interface LeaderboardScoreUploaded {
+    score: number
+    scoreChanged: boolean
+    globalRankNew: number
+    globalRankPrevious: number
+  }
+  export interface LeaderboardInfo {
+    name: string
+    entryCount: number
+    sortMethod?: LeaderboardSortMethod
+    displayType?: LeaderboardDisplayType
+  }
+  /** Resolves to false for a missing board; Steam transport errors reject. */
+  export function findLeaderboard(name: string): Promise<boolean>
+  /** Sort and display are only applied when Steam creates the board. */
+  export function findOrCreateLeaderboard(name: string, sortMethod: LeaderboardSortMethod, displayType: LeaderboardDisplayType): Promise<boolean>
+  /** Creates the board if missing. Existing boards keep their configuration. */
+  export function uploadLeaderboardScore(name: string, sortMethod: LeaderboardSortMethod, displayType: LeaderboardDisplayType, method: UploadScoreMethod, score: number, details?: Array<number> | undefined | null): Promise<LeaderboardScoreUploaded>
+  /** Global ranks start at 1. Around-user offsets may be negative. Friends ignores the range. */
+  export function downloadLeaderboardEntries(name: string, request: LeaderboardDataRequest, rangeStart: number, rangeEnd: number, maxDetails?: number | undefined | null): Promise<Array<LeaderboardEntry>>
+  export function getLeaderboardEntryCount(name: string): Promise<number>
+  export function getLeaderboardInfo(name: string): Promise<LeaderboardInfo>
 }
 export declare namespace localplayer {
   export function getSteamId(): PlayerSteamId
   export function getName(): string
   export function getLevel(): number
+  export function isLoggedOn(): boolean
+  export function clearRichPresence(): void
   /** @returns the 2 digit ISO 3166-1-alpha-2 format country code which client is running in, e.g. "US" or "UK". */
   export function getIpCountry(): string
   export function setRichPresence(key: string, value?: string | undefined | null): void
@@ -128,18 +271,64 @@ export declare namespace matchmaking {
     Public = 2,
     Invisible = 3
   }
+  export const enum LobbyComparison {
+    Equal = 0,
+    NotEqual = 1,
+    GreaterThan = 2,
+    GreaterThanOrEqual = 3,
+    LessThan = 4,
+    LessThanOrEqual = 5
+  }
+  export const enum LobbyDistance {
+    Close = 0,
+    Default = 1,
+    Far = 2,
+    Worldwide = 3
+  }
+  export interface LobbyStringFilter {
+    key: string
+    value: string
+    /** Defaults to Equal. */
+    comparison?: LobbyComparison
+  }
+  export interface LobbyNumberFilter {
+    key: string
+    value: number
+    comparison: LobbyComparison
+  }
+  export interface LobbyNearFilter {
+    key: string
+    value: number
+  }
+  export interface LobbyListFilter {
+    stringFilters?: Array<LobbyStringFilter>
+    numberFilters?: Array<LobbyNumberFilter>
+    /** Sort by proximity to these values, in priority order. */
+    nearValueFilters?: Array<LobbyNearFilter>
+    slotsAvailable?: number
+    distance?: LobbyDistance
+    count?: number
+  }
   export function createLobby(lobbyType: LobbyType, maxMembers: number): Promise<Lobby>
   export function joinLobby(lobbyId: bigint): Promise<Lobby>
-  export function getLobbies(): Promise<Array<Lobby>>
+  export function getLobbies(filter?: LobbyListFilter | undefined | null): Promise<Array<Lobby>>
   export class Lobby {
     id: bigint
     join(): Promise<Lobby>
     leave(): void
     openInviteDialog(): void
+    /** Broadcast up to 4096 bytes to the lobby, including the sender. */
+    sendChatMessage(message: Buffer): void
+    /** Read the bytes identified by a LobbyChatMsg callback. Missing entries return an empty buffer. */
+    getChatEntry(chatId: number): Buffer
     getMemberCount(): bigint
     getMemberLimit(): bigint | null
     getMembers(): Array<PlayerSteamId>
     getOwner(): PlayerSteamId
+    /** Set metadata for the local member, not for the lobby itself. */
+    setMemberData(key: string, value: string): void
+    /** Steam does not distinguish a missing member value from an empty one. */
+    getMemberData(steamId64: bigint, key: string): string | null
     setJoinable(joinable: boolean): boolean
     getData(key: string): string | null
     setData(key: string, value: string): boolean
@@ -188,8 +377,46 @@ export declare namespace networking {
   export function isP2PPacketAvailable(): number
   export function readP2PPacket(size: number): P2PPacket
   export function acceptP2PSession(steamId64: bigint): void
+  export function closeP2PSession(steamId64: bigint): void
+}
+export declare namespace networking_messages {
+  export interface Message {
+    data: Buffer
+    steamId?: PlayerSteamId
+  }
+  export const enum MessageSendType {
+    ReliableNoNagle = 0,
+    Reliable = 1,
+    Unreliable = 2,
+    UnreliableNoDelay = 3
+  }
+  /** Queues a message and implicitly accepts a session from this peer. Success is not delivery. */
+  export function sendMessageToUser(steamId64: bigint, data: Buffer, channel?: number | undefined | null, sendType?: MessageSendType | undefined | null): void
+  /** Polls one channel (default 0) for up to 1–32 messages (default 10). */
+  export function receiveMessagesOnChannel(channel?: number | undefined | null, maxMessages?: number | undefined | null): Array<Message>
+  export interface SessionFailure {
+    steamId?: PlayerSteamId
+  }
+  export interface SessionRequest {
+    steamId?: PlayerSteamId
+  }
+  /** Notifies without accepting. Omit the handler to stop listening. */
+  export function setSessionRequestHandler(handler?: (request: SessionRequest) => void): void
+  /** Accept a known peer's pending request without sending a message. */
+  export function acceptSessionWithUser(steamId64: bigint): boolean
+  /** Close the peer's session on all channels. This does not block future requests. */
+  export function closeSessionWithUser(steamId64: bigint): boolean
+  /** Replaces the failure handler. Omit the handler to stop listening. */
+  export function setSessionFailedHandler(handler?: (failure: SessionFailure) => void): void
 }
 export declare namespace overlay {
+  export const enum NotificationPosition {
+    TopLeft = 0,
+    TopRight = 1,
+    BottomLeft = 2,
+    BottomRight = 3
+  }
+  export function setNotificationPosition(position: NotificationPosition): void
   export const enum Dialog {
     Friends = 0,
     Community = 1,
@@ -210,13 +437,24 @@ export declare namespace overlay {
   export function activateToWebPage(url: string): void
   export function activateToStore(appId: number, flag: StoreFlag): void
 }
+export declare namespace screenshots {
+  /** Asks the Steam overlay to capture the current frame. */
+  export function triggerScreenshot(): void
+  /** Imports a JPEG from disk. Pass null for thumbnailFilename to let Steam generate it. */
+  export function addScreenshotToLibrary(filename: string, thumbnailFilename: null, width: number, height: number): number
+}
 export declare namespace stats {
   export function getInt(name: string): number | null
   export function setInt(name: string, value: number): boolean
+  export function getFloat(name: string): number | null
+  /** Updates a FLOAT stat locally. Call store() to persist it on Steam. */
+  export function setFloat(name: string, value: number): boolean
   export function store(): boolean
   export function resetAll(achievementsToo: boolean): boolean
 }
 export declare namespace utils {
+  export function isOverlayEnabled(): boolean
+  export function uiLanguage(): string
   export function getAppId(): number
   export function getServerRealTime(): number
   export function isSteamRunningOnSteamDeck(): boolean
@@ -281,7 +519,25 @@ export declare namespace workshop {
     progress: bigint
     total: bigint
   }
-  export function createItem(appId?: number | undefined | null): Promise<UgcResult>
+  export const enum FileType {
+    Community = 0,
+    Microtransaction = 1,
+    Collection = 2,
+    Art = 3,
+    Video = 4,
+    Screenshot = 5,
+    Game = 6,
+    Software = 7,
+    Concept = 8,
+    WebGuide = 9,
+    IntegratedGuide = 10,
+    Merch = 11,
+    ControllerBinding = 12,
+    SteamworksAccessInvite = 13,
+    SteamVideo = 14,
+    GameManagedItem = 15
+  }
+  export function createItem(appId?: number | undefined | null, fileType?: FileType | undefined | null): Promise<UgcResult>
   export function updateItem(itemId: bigint, updateDetails: UgcUpdate, appId?: number | undefined | null): Promise<UgcResult>
   export function updateItemWithCallback(itemId: bigint, updateDetails: UgcUpdate, appId: number | undefined | null, successCallback: (data: UgcResult) => void, errorCallback: (err: any) => void, progressCallback?: (data: UpdateProgress) => void, progressCallbackIntervalMs?: number | undefined | null): void
   /**
@@ -336,6 +592,7 @@ export declare namespace workshop {
    * @returns an array of subscribed workshop item ids
    */
   export function getSubscribedItems(): Array<bigint>
+  export function deleteItem(itemId: bigint): Promise<void>
   export const enum UGCQueryType {
     RankedByVote = 0,
     RankedByPublicationDate = 1,

@@ -1,11 +1,13 @@
 [![Build Status](https://github.com/kyeshmz/steamworks.js/actions/workflows/publish.yml/badge.svg)](https://github.com/kyeshmz/steamworks.js/actions/workflows/publish.yml)
-[![npm](https://img.shields.io/npm/v/steamworks.js.svg)](https://npmjs.com/package/steamworks.js)
+[![npm](https://img.shields.io/npm/v/@kyeshmz/steamworks.js.svg)](https://npmjs.com/package/@kyeshmz/steamworks.js)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Chat](https://img.shields.io/discord/663831597690257431?label=chat&logo=discord)](https://discord.gg/H6B7UE7fMY)
 
 # Steamworks.js
 
 This fork tracks [actionable upstream issues](https://github.com/kyeshmz/steamworks.js/issues/1). The `steamworks.js` package on npm is the upstream release.
+
+The [fork and issue audit](docs/coverage/README.md) compares implementations and lists remaining work. See [the fork feature guide](docs/fork-features.md) for the APIs available here and their verification status.
 
 A modern implementation of the Steamworks SDK for HTML/JS and NodeJS based applications.
 
@@ -25,7 +27,7 @@ I used [greenworks](https://github.com/greenheartgames/greenworks) for a long ti
 ## API
 
 ```js
-const steamworks = require('steamworks.js')
+const steamworks = require('@kyeshmz/steamworks.js')
 
 // You can pass an appId, or don't pass anything and use a steam_appid.txt file
 const client = steamworks.init(480)
@@ -39,35 +41,24 @@ if (client.achievement.activate('ACHIEVEMENT')) {
 }
 ```
 
-You can refer to the [declarations file](https://github.com/ceifa/steamworks.js/blob/main/client.d.ts) to check the API support and get more detailed documentation of each function.
+See the [TypeScript declarations](client.d.ts) for supported calls and their signatures.
 
 ## Installation
 
 To use steamworks.js you don't have to build anything, just install it from npm:
 
 ```sh
-$: npm i steamworks.js
+pnpm add @kyeshmz/steamworks.js
 ```
 
 ### Electron
 
-Steamworks.js is a native module and cannot be used by default in the renderer process. To enable the usage of native modules on the renderer process, the following configurations should be made on `main.js`:
-
-```js
-const mainWindow = new BrowserWindow({
-    // ...
-    webPreferences: {
-        // ...
-        contextIsolation: false,
-        nodeIntegration: true
-    }
-})
-```
+Initialize Steam in the Electron main process. Expose only the operations the renderer needs through a sandboxed [preload](test/electron/preload.js) and [main-process handlers](test/electron/main.js). The example keeps context isolation enabled and Node integration disabled.
 
 To make the steam overlay working, call the `electronEnableSteamOverlay` on the end of your `main.js` file:
 
 ```js
-require('steamworks.js').electronEnableSteamOverlay()
+require('@kyeshmz/steamworks.js').electronEnableSteamOverlay()
 ```
 
 For the production build, copy the relevant distro files from `sdk/redistributable_bin/{YOUR_DISTRO}` into the root of your build. If you are using electron-forge, look for [#75](https://github.com/ceifa/steamworks.js/issues/75).
@@ -81,7 +72,13 @@ Make sure you have the latest [node.js](https://nodejs.org/en/), [Rust](https://
 
 From the repository root, run `corepack enable`, `pnpm install --frozen-lockfile`, and `pnpm run build:debug` to build the library.
 
-There is no way to build for all targets easily. The good news is that you don't need to. You can develop and test on your current target, and open a PR. When the code is merged to main, a github action will build for all targets and publish a new version.
+CI builds for Linux x64, Windows x64, and both macOS architectures.
+
+## Releases
+
+Use Conventional Commits (`fix:`, `feat:`, or `feat!:`). After CI passes on `main`, Release Please opens or updates a PR with the version and [changelog](CHANGELOG.md). Merging the release PR creates a GitHub release and publishes the tested tarball to npm.
+
+For the first publication, configure the repository secret `NPM_TOKEN` with publish access to `@kyeshmz/steamworks.js`. After the package exists, configure npm trusted publishing for `kyeshmz/steamworks.js`, workflow `publish.yml`, and remove the bootstrap token. A failed npm publication can be retried by dispatching the Publish workflow on the existing release tag.
 
 ### Testing Electron
 

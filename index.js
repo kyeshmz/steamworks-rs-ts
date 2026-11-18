@@ -8,12 +8,10 @@ if (platform === 'win32' && arch === 'x64') {
     nativeBinding = require('./dist/win64/steamworksjs.win32-x64-msvc.node')
 } else if (platform === 'linux' && arch === 'x64') {
     nativeBinding = require('./dist/linux64/steamworksjs.linux-x64-gnu.node')
-} else if (platform === 'darwin') {
-    if (arch === 'x64') {
-        nativeBinding = require('./dist/osx/steamworksjs.darwin-x64.node')
-    } else if (arch === 'arm64') {
-        nativeBinding = require('./dist/osx/steamworksjs.darwin-arm64.node')
-    }
+} else if (platform === 'darwin' && arch === 'x64') {
+    nativeBinding = require('./dist/osx/steamworksjs.darwin-x64.node')
+} else if (platform === 'darwin' && arch === 'arm64') {
+    nativeBinding = require('./dist/osx/steamworksjs.darwin-arm64.node')
 } else {
     throw new Error(`Unsupported OS: ${platform}, architecture: ${arch}`)
 }
@@ -23,7 +21,7 @@ let runCallbacksInterval = undefined
 /**
  * Initialize the steam client or throw an error if it fails
  * @param {number} [appId] - App ID of the game to load, if undefined, will search for a steam_appid.txt file
- * @returns {Omit<Client, 'init' | 'runCallbacks'>}
+ * @returns {Omit<Client, 'init' | 'runCallbacks' | 'restartAppIfNecessary'>}
 */
 module.exports.init = (appId) => {
     const { init: internalInit, runCallbacks, restartAppIfNecessary, ...api } = nativeBinding

@@ -1,0 +1,1737 @@
+{
+  "upstream": "80c5fd7c4958ba90cf87403c3f967b8a6d748473",
+  "forks": [
+    [
+      "00due/steamworks.js",
+      "main",
+      "1b7872c35af25fa11614af2f3cf8bec283a42e81"
+    ],
+    [
+      "9khub/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "AuWiMo/steamworks.js",
+      "main",
+      "83880bc054f01c7bc4c9127850f744698433b0d1"
+    ],
+    [
+      "BlackWither17/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "BlueRikoroo/steamworks.js",
+      "main",
+      "f279a620b591c1c2d5b4e53f3d642ba337528667"
+    ],
+    [
+      "BluesquallGames/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "BrunoCaxito/steamworks.js",
+      "main",
+      "0d2d573782841f72e02cc519c57a090a054c3628"
+    ],
+    [
+      "CaveREU/steamworks.js",
+      "main",
+      "bd30b388b65cbc714eaf6b84e02cb87e15659a4a"
+    ],
+    [
+      "Centerpoint-Gaming/steamworks.js-fork",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "Coderah/steamworks.js",
+      "main",
+      "6eefe565c025f1aa1a5b58c0e12a69fcda299956"
+    ],
+    [
+      "CosmoLau/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "CrasAtHeri/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "DavidBCD/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "FreddieGilbraith/steamworks.js",
+      "main",
+      "0cccf4176b6b453b7fa02d1bc84fc9c886b9516d"
+    ],
+    [
+      "GingerNinjaStickdudeWorld/steamworks.js",
+      "main",
+      "bd30b388b65cbc714eaf6b84e02cb87e15659a4a"
+    ],
+    [
+      "Gurigraphics/steamworks.js",
+      "main",
+      "473866aeb6b6b3b3ed78bb989f43ac1a79a6a817"
+    ],
+    [
+      "Happy-Ferret-Entertainment/steamworks.js",
+      "main",
+      "e0ca5378d46c91e646eba0390fb91b16f08a966b"
+    ],
+    [
+      "Inateno/steamworks.js",
+      "main",
+      "f279a620b591c1c2d5b4e53f3d642ba337528667"
+    ],
+    [
+      "JDeffner/steamworks.js",
+      "main",
+      "673688b2849aa6a44b9ca3203f78c28b4dff070a"
+    ],
+    [
+      "Jackson0ne/steamworks.js",
+      "main",
+      "425994e7656760653fe8657a6d88715798623070"
+    ],
+    [
+      "James226/steamworks.js",
+      "main",
+      "da6d9db83c93fcf81b9f0ce6abf9573e74afe0f5"
+    ],
+    [
+      "KlutzyBubbles/steamworks.js",
+      "main",
+      "bd30b388b65cbc714eaf6b84e02cb87e15659a4a"
+    ],
+    [
+      "LarsCowe/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "Luc-Mcgrady/steamworks.js",
+      "main",
+      "9735d6a8f752e40356d8ecac05c158ddfed346c8"
+    ],
+    [
+      "Matemaatikko/steamworks.js",
+      "main",
+      "5a1f44ff714af84b6036b718ef657b064c098cbe"
+    ],
+    [
+      "MikalDev/steamworks.js",
+      "main",
+      "18729c949395ccf033d857105357bf69e0353c3d"
+    ],
+    [
+      "Octavia-Blue/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "Pyrofennec21/steamworks.js",
+      "main",
+      "bd1c9d31fb6994c960f9d9822aa660c9363217b1"
+    ],
+    [
+      "RatWasHere/steamworks.js",
+      "main",
+      "7e92090e3676370788e5820f13cec9b97ca4b34a"
+    ],
+    [
+      "Slakinov/steamworks.js",
+      "main",
+      "9bd26f52bba933094014644e6a8c8976b8ce2440"
+    ],
+    [
+      "Spillmaker/steamworks.js",
+      "main",
+      "2aba0e2bd81fb952df5bff7aa0495430fa76500d"
+    ],
+    [
+      "SteelWaffe/steamworks.js",
+      "main",
+      "2049841808aa4521c9079507c0a71d0773cd3e0e"
+    ],
+    [
+      "SteffTek/steamworks.js",
+      "main",
+      "b90a16174608e720b679fba418bc4ae67091f054"
+    ],
+    [
+      "SunZhi-Will/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "Telazer/steamworks.js",
+      "main",
+      "b24d964f1ddacdb06d5482013bfafc701fea8d68"
+    ],
+    [
+      "Thelvaen/steamworks.js",
+      "main",
+      "dd0ebfbab44cd2663b97a73c4180c14b6f009bc8"
+    ],
+    [
+      "XinLiu100/steamworks.js",
+      "main",
+      "6eefe565c025f1aa1a5b58c0e12a69fcda299956"
+    ],
+    [
+      "adamdburton/steamworks.js",
+      "main",
+      "28f86effd819d2f2bf28cfe0ccaad8d5f4b3f3a9"
+    ],
+    [
+      "adamosimpson21/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "adamringhede/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "adrianmarple/steamworks.js",
+      "main",
+      "57cd0feb7eea76f42f98ea62f499fde353cb8add"
+    ],
+    [
+      "ai-zen/steamworks.js",
+      "main",
+      "5fd35d92ef52af77e6ee2157f4e9d1936782d507"
+    ],
+    [
+      "alexwarddev1230/steamworks.js",
+      "main",
+      "a05422682cc2a521de9dd6fc45455b56e1d3a383"
+    ],
+    [
+      "arthuro555/steamworks.js",
+      "main",
+      "d2eda3a56c74ffa55b8c729953f7db357eae23b1"
+    ],
+    [
+      "byersdz/steamworks.js",
+      "main",
+      "fa9b68db2459d1dc5082b37ca50f47d151ce6c72"
+    ],
+    [
+      "bytemode/steamworks.js",
+      "main",
+      "5635d3f9134ff9645cfeb540ac37a5367e65f748"
+    ],
+    [
+      "catloversg/steamworks.js",
+      "npm-publish",
+      "d6c606a0777e9beed0cfe5a04363229fcd17724d"
+    ],
+    [
+      "cfischer/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "cielavenir/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "cjstone1982/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "codingMASTER398/steamworks.js",
+      "main",
+      "400ee4bd7acc18ae3768f5ee81ebd7fdc7d33095"
+    ],
+    [
+      "colining/steamworks.js",
+      "main",
+      "fb89c5f8f4186c2d87930aed5b4db1df137ffc0e"
+    ],
+    [
+      "cooljingle/steamworks.js",
+      "main",
+      "eeefd549fc6730bb1ee4f7fec680a68dff188eb2"
+    ],
+    [
+      "cpojer/steamworks.js",
+      "main",
+      "d263146fb0a08f902ce89a6780ea05e84c21a590"
+    ],
+    [
+      "cursoracc1/steamworks.js",
+      "main",
+      "d5c5e4e3567ff4ef94099a566f992818fd7df59f"
+    ],
+    [
+      "davidvgalbraith/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "dawiisss/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "dfabulich/steamworks.js",
+      "main",
+      "54b8f5d15dae48eac7b425c03c8c0192674cb7cd"
+    ],
+    [
+      "dlawrence-ghg/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "dream-sloth-games/steamworks.js",
+      "main",
+      "842fc1f23aa4892e5cbb7b75cb7d4e600c159863"
+    ],
+    [
+      "drmargarido/steamworks.js",
+      "main",
+      "4094dbf26898681d2676203c84fd94b8798fd277"
+    ],
+    [
+      "dsh0416/steamworks.js",
+      "main",
+      "c38b33095627e8aa1219574500f3bf5acba4da90"
+    ],
+    [
+      "dustinlacewell/steamworks.js",
+      "main",
+      "6eefe565c025f1aa1a5b58c0e12a69fcda299956"
+    ],
+    [
+      "enfp-dev-studio/steamworks.js",
+      "main",
+      "8b3fa1f95e47b61f41112daa3c1855cb18137191"
+    ],
+    [
+      "ericmbernier/steamworks.js",
+      "main",
+      "30345ca134efdf12e4e03e3526db2a481c110ebc"
+    ],
+    [
+      "explodi/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "fixfell7/steamworks.js",
+      "main",
+      "3ba39a19a798ba74aa59c11fdffa8c531d8c83a4"
+    ],
+    [
+      "flowtycz/steamworks.js",
+      "main",
+      "35e5edd0f5cda4cf19a8fb0795827b9e7327c6ba"
+    ],
+    [
+      "framerate/steamworks.js",
+      "main",
+      "41b771019a06903e40ebce6bdc89736323bec978"
+    ],
+    [
+      "gnal/steamworks.js",
+      "main",
+      "22635d5116b82ae60eb395a40077c131d233fa8b"
+    ],
+    [
+      "goosehub/steamworks.js",
+      "main",
+      "0d1203f1e6eb353f8b8169ee237b036e20a24062"
+    ],
+    [
+      "headcr4sh/steamworks.js",
+      "main",
+      "fa389ccc236064805e743b7a41ee12a04031c88f"
+    ],
+    [
+      "ivangospodinow/steamworks2.js",
+      "main",
+      "2a9222b7cf5c2cbb8ba35ac8c97a230d50750f6d"
+    ],
+    [
+      "jespertheend/steamworks.js",
+      "main",
+      "7a4813fbe9e34ef574042dacbbd69dcc306e9e1b"
+    ],
+    [
+      "jstroh/steamworks.js",
+      "main",
+      "0f84c6b9cde2039171f22a1862b8adea32bd2221"
+    ],
+    [
+      "knightarcher/steamworks.js",
+      "main",
+      "5635d3f9134ff9645cfeb540ac37a5367e65f748"
+    ],
+    [
+      "koyuuji/steamworks.js",
+      "main",
+      "498a8ab6c9392b72d6a909e6cc8569d5030e049b"
+    ],
+    [
+      "kwokhung-wong/steamworks.js",
+      "main",
+      "6eefe565c025f1aa1a5b58c0e12a69fcda299956"
+    ],
+    [
+      "kyeshmz/steamworks.js",
+      "main",
+      "dea04d49de8bb897f52f08b2fa1e0563c44cc8da"
+    ],
+    [
+      "liana-p/steamworks.js",
+      "main",
+      "6eefe565c025f1aa1a5b58c0e12a69fcda299956"
+    ],
+    [
+      "linorabolini/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "liro-u/steamworksjs",
+      "main",
+      "5223dafd0806ee38ce3bca717c6b9641f990bf64"
+    ],
+    [
+      "littlecatcatx/steamworks.js",
+      "main",
+      "6eefe565c025f1aa1a5b58c0e12a69fcda299956"
+    ],
+    [
+      "littlerspade/steamworks.js",
+      "main",
+      "5635d3f9134ff9645cfeb540ac37a5367e65f748"
+    ],
+    [
+      "livingyang/steamworks.js",
+      "main",
+      "78fa4574ff84c8dad4c4cc31f75da4dd9f03b073"
+    ],
+    [
+      "mazyl-pl/steamworks.js",
+      "main",
+      "5cbcf413fcaad337ddd145059b4efb31d2493905"
+    ],
+    [
+      "mix-steam-app/steamworks.js",
+      "main",
+      "7d95b10033473156739632d37972df147d59d24e"
+    ],
+    [
+      "mzmiric5/steamworks.js",
+      "main",
+      "92e73fa417206217622d7a525f37bdbd5ce280ac"
+    ],
+    [
+      "nergmada/steamworks.js",
+      "main",
+      "70db2679a34bb59755c60ae8f8c098b482a06d60"
+    ],
+    [
+      "only0322/steamworks.js",
+      "main",
+      "31f88a38dbe0f07cc247ed15f6afa577399b1941"
+    ],
+    [
+      "openfrontio/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "pavelsima/steamworks.js",
+      "main",
+      "ac61fbc791b5a1551457b7eff8aa01ee87b5da46"
+    ],
+    [
+      "podrivo/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "porezalsya/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "potdig/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "raymondtri/steamworks.js",
+      "main",
+      "31f88a38dbe0f07cc247ed15f6afa577399b1941"
+    ],
+    [
+      "rghassem/steamworks.js",
+      "main",
+      "e3deb3b84e9a6f0209ef53e583a46e5107f0648b"
+    ],
+    [
+      "robertkolloch/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "ruanxiantao/steamworks.js",
+      "main",
+      "6eefe565c025f1aa1a5b58c0e12a69fcda299956"
+    ],
+    [
+      "secretcowlevel/steamworks.js",
+      "main",
+      "56e80a4a62eece626690eac0e91459768820665d"
+    ],
+    [
+      "sefacndmr01/steamworks.js",
+      "main",
+      "ed81aa0a08306e01a62066683a8837d679ec2c8e"
+    ],
+    [
+      "shinhirota/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "sht2017/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "skyatgit/steamworks.js",
+      "main",
+      "d67036138a5706426c41511bd954ef701c7feb0a"
+    ],
+    [
+      "spacemoonfly/steamworks.js",
+      "main",
+      "80c5fd7c4958ba90cf87403c3f967b8a6d748473"
+    ],
+    [
+      "spencermcw/steamworks.js",
+      "main",
+      "f8b2a24404766ad45a9890fa0fc7bd5f261c0336"
+    ],
+    [
+      "st14n/steamworks.js",
+      "main",
+      "206fc5be6aff62eb62286c417c3547c6e8559939"
+    ],
+    [
+      "tangdaoyuan/steamworks.js",
+      "main",
+      "e7260183760e91d025fe09495f87051c3c522b29"
+    ],
+    [
+      "teacher-army/steamworks.js",
+      "main",
+      "719ff628b526f4fc53ad6045eb0b848596bcc36b"
+    ],
+    [
+      "thunder3057/steamworks.js",
+      "main",
+      "044f98a6920881b5dff9ce87b98900746cc194e2"
+    ],
+    [
+      "timelessnesses/steamworks.js-inputs",
+      "main",
+      "b3b6fe7a3fcef3839ce648a3fed17f1a1958f612"
+    ],
+    [
+      "titansoftime/steamworks.js",
+      "main",
+      "92e73fa417206217622d7a525f37bdbd5ce280ac"
+    ],
+    [
+      "tlm9201/steamworks.js",
+      "main",
+      "f279a620b591c1c2d5b4e53f3d642ba337528667"
+    ],
+    [
+      "vbalien/steamworks.js",
+      "main",
+      "512edf4e460f23525c32b533701b8a1a2e212526"
+    ],
+    [
+      "vcastroglez/steamworks-sanji.js",
+      "main",
+      "3cb213519d452be2dc187c48c6f78b1afea35a6f"
+    ],
+    [
+      "whaqzhzd/steamworks.js",
+      "main",
+      "8180e59214cb0073e4d153deb73986deecf23e2b"
+    ],
+    [
+      "wrygiel/steamworks.js",
+      "main",
+      "fa5800d07420973ac3ab35a48f9792b14bf96742"
+    ],
+    [
+      "wuyadie/steamworks.js",
+      "main",
+      "eeefd549fc6730bb1ee4f7fec680a68dff188eb2"
+    ],
+    [
+      "yorkzero831/steamworks.js",
+      "main",
+      null
+    ],
+    [
+      "zhuiying123/steamworks.js",
+      "main",
+      "5635d3f9134ff9645cfeb540ac37a5367e65f748"
+    ],
+    [
+      "zzctmac/steamworks.js",
+      "main",
+      "5635d3f9134ff9645cfeb540ac37a5367e65f748"
+    ]
+  ],
+  "pulls": [
+    [
+      2,
+      "473866aeb6b6b3b3ed78bb989f43ac1a79a6a817",
+      "CLOSED",
+      "Added SteamMatchmaking and SteamData "
+    ],
+    [
+      3,
+      "f5de0e65b8b53a8c62a37d7405802d9e14b644f4",
+      "CLOSED",
+      "Update documentation"
+    ],
+    [
+      4,
+      "68e24c79b473a60029aff8ab5c45624e4019ce7a",
+      "MERGED",
+      "Update README"
+    ],
+    [
+      5,
+      "6eccbfdaef8edea1c561c839ab108a9964437d29",
+      "MERGED",
+      "Adds Subscribe and Unsubscribe"
+    ],
+    [
+      7,
+      "6623f061d8350c66f5f199f1d28a4d42d704f2fa",
+      "CLOSED",
+      "Adds SteamUGC GetItemState"
+    ],
+    [
+      8,
+      "df22bbf85eab31798d546a6fe5c9b61fc96d6299",
+      "MERGED",
+      "Adds SteamUGC GetItemState"
+    ],
+    [
+      9,
+      "3cc6139543614222526a3e6f3303f2b80ddb171f",
+      "MERGED",
+      "Adds SteamUGC GetItemInstallInfo"
+    ],
+    [
+      10,
+      "074f9fdb5f1f03c7070afccc2f7a897055647669",
+      "MERGED",
+      "Update README.md"
+    ],
+    [
+      11,
+      "9cab2a6682193e72c6e37605a39d2517a4499ba6",
+      "MERGED",
+      "Adds SteamUGC DownloadItem and GetItemDownloadInfo"
+    ],
+    [
+      13,
+      "b9a4afb973844ee1ec1590aefb144da0e574669d",
+      "MERGED",
+      "Update docs"
+    ],
+    [
+      17,
+      "aa32da3c3c6faf8f988d976e2ce893073537e92d",
+      "MERGED",
+      "m1 support"
+    ],
+    [
+      20,
+      "fa389ccc236064805e743b7a41ee12a04031c88f",
+      "MERGED",
+      "Fix TypeScript definitions."
+    ],
+    [
+      27,
+      "6b4b2ec5dbf9e0f03b4a99375bee3a0e015301f9",
+      "MERGED",
+      "Add support for isSubscribedApp"
+    ],
+    [
+      28,
+      "2fba2455a8bf10b27d34e471bc7750fcc96bd660",
+      "MERGED",
+      "document that cross-compiling doesn't work"
+    ],
+    [
+      29,
+      "4b5fbc31b9023b2524047ef0ef05207b365d6415",
+      "MERGED",
+      "More ISteamApps APIs"
+    ],
+    [
+      30,
+      "f70a9b832d8af23292a76e10026ef88d9a6acb1b",
+      "MERGED",
+      "Add restartAppIfNecessary. Fixes #24"
+    ],
+    [
+      31,
+      "2f5ee9ead6c820060fdadf87641fd3c0013b9f88",
+      "MERGED",
+      "Link to Github in package.json"
+    ],
+    [
+      32,
+      "327b86f57f9fe6063345632d2b592d1185334765",
+      "MERGED",
+      "Export restartAppIfNecessary on the top-level steamworks object"
+    ],
+    [
+      37,
+      "44e6fbde6161e14579eb070b8981a1817e01eebe",
+      "MERGED",
+      "Add support for checking whether a file exists"
+    ],
+    [
+      43,
+      "c38b098b3c22a91218208561bf77c58fd15f07c4",
+      "MERGED",
+      "Add matchmaking API"
+    ],
+    [
+      49,
+      "c50aab5b81029798522b813eddf12a68f8260ee5",
+      "OPEN",
+      "Document `--no-sandbox` Linux launch option"
+    ],
+    [
+      58,
+      "a303a87e8c50dc516ba08490ecbf34eaf060094f",
+      "MERGED",
+      "Adds a new MacOS Build for v0.0.25 of Steamworks.js"
+    ],
+    [
+      66,
+      "da6d9db83c93fcf81b9f0ce6abf9573e74afe0f5",
+      "MERGED",
+      "Update darwin-arm64 variant to 0.0.28"
+    ],
+    [
+      73,
+      "fe9ae511f27fcb48d208724c8643374179742b9e",
+      "UNKNOWN",
+      "remove unused crate"
+    ],
+    [
+      78,
+      "99534acfa6764d6d3f83cc5a61373db1b4db8db8",
+      "MERGED",
+      "feat: appid overwrite"
+    ],
+    [
+      81,
+      "3c1a6508d58feab6015f16bf6af5173d00b9da51",
+      "MERGED",
+      "Added some utils functions. Fixes #76"
+    ],
+    [
+      82,
+      "29fb9b9a76464f71d568928111b65d7143f53040",
+      "MERGED",
+      "Fix broken build."
+    ],
+    [
+      84,
+      "d40321a4ad74b2d40dca46be22c8fd14b61b2140",
+      "MERGED",
+      "Restore Cargo.lock"
+    ],
+    [
+      85,
+      "7840f66cf4460053ce6f448ee6bfd21d846c0e61",
+      "MERGED",
+      "Minor refactorings and add clippy on build"
+    ],
+    [
+      92,
+      "eddb67da7a7f63ba20c8cd1d6006a3dc79dbd973",
+      "MERGED",
+      "add cross compilation"
+    ],
+    [
+      96,
+      "27e1b2016ff7f32282a577297bd9346c2f15d7f2",
+      "MERGED",
+      "Activate Steam Overlay"
+    ],
+    [
+      98,
+      "72874156aff6962f0b604398fb104a6f302eb823",
+      "MERGED",
+      "Add a button to test the overlay"
+    ],
+    [
+      106,
+      "b2d1e1eac3dee07b658745a04bf30c889b1d945c",
+      "MERGED",
+      "Restore instructions for testing Electron"
+    ],
+    [
+      113,
+      "4c047c76e6a59cb9a1fb578ee43148aec06511b5",
+      "MERGED",
+      "Add utils.showFloatingGamepadTextInput()"
+    ],
+    [
+      114,
+      "af1c01a679cc335dfe9c08e7f359fce3e899c158",
+      "MERGED",
+      "Fix MacOS builds code signing"
+    ],
+    [
+      115,
+      "8e494edcacdf1431ddd7af58156926a2c5f7274e",
+      "OPEN",
+      "electron-builder example"
+    ],
+    [
+      117,
+      "c68495fc6216c5878d3857a72f92788aafcbee11",
+      "MERGED",
+      "split code check action"
+    ],
+    [
+      125,
+      "57a53bace41144842e0da0c9f37a1b3b9f142644",
+      "MERGED",
+      "Add `update_item_with_callback` and `get_auth_ticket_for_web_api` method. Change `get_session_ticket` to `get_session_ticket_with_steam_id`."
+    ],
+    [
+      130,
+      "0d1203f1e6eb353f8b8169ee237b036e20a24062",
+      "MERGED",
+      "Update README.md"
+    ],
+    [
+      137,
+      "83880bc054f01c7bc4c9127850f744698433b0d1",
+      "MERGED",
+      "Update README.md"
+    ],
+    [
+      140,
+      "bee7f4c8f8fe229184a0ef8b89f82adbd135ff84",
+      "MERGED",
+      "upgrade to track most recent version of steamworks-rs"
+    ],
+    [
+      142,
+      "1849a3b6ccc2bd2e4e0c77be4af952aa3113d009",
+      "CLOSED",
+      "Steam Networking Messages"
+    ],
+    [
+      143,
+      "f4c1244478e19e179e8a4116d292cd62fcf6b459",
+      "MERGED",
+      "Update SDK to 1.58a and Add more method to the workshop mod."
+    ],
+    [
+      146,
+      "f159b670146eb8959624ade3b3f50e82ebe66d74",
+      "MERGED",
+      "cloud: add list_files method"
+    ],
+    [
+      147,
+      "801c0a9695eb2211b752fe8816bbb59f600d3c1c",
+      "CLOSED",
+      "Update README to clarify Steam Overlay compatibility issues"
+    ],
+    [
+      155,
+      "fa5800d07420973ac3ab35a48f9792b14bf96742",
+      "MERGED",
+      "Add `Controller.getHandle()`"
+    ],
+    [
+      157,
+      "cb128bc569e18ebb5abdfbc5c3ab93db143cd3c1",
+      "MERGED",
+      "API: Get achievements"
+    ],
+    [
+      158,
+      "f5f80fb8a8b3bd81a2e806f16bf6dfb2215dffd1",
+      "MERGED",
+      "API: Enable/disable cloud for app"
+    ],
+    [
+      159,
+      "2120fb810942584c9204e27d37c5ddfad4a366e4",
+      "CLOSED",
+      "MISC: Remove unused variable in init function"
+    ],
+    [
+      172,
+      "7e92090e3676370788e5820f13cec9b97ca4b34a",
+      "MERGED",
+      "Add Workshop Deletion"
+    ],
+    [
+      174,
+      "4094dbf26898681d2676203c84fd94b8798fd277",
+      "MERGED",
+      "Made build action use an older ubuntu machine to prevent glibc versions issues"
+    ],
+    [
+      177,
+      "dd0ebfbab44cd2663b97a73c4180c14b6f009bc8",
+      "OPEN",
+      "additional wrappers"
+    ],
+    [
+      178,
+      "3457614345522038c448a7962b46b0bfabb9d774",
+      "OPEN",
+      "Channel Support for Networking"
+    ],
+    [
+      179,
+      "ede25cc2151ac6482639ea5365359f4a9d56fad6",
+      "CLOSED",
+      "Networking Messages implementation with request session toggle"
+    ],
+    [
+      180,
+      "9d37f19d50ff4c358998969b18842cb30bb46b12",
+      "OPEN",
+      "added is_testing env variable so that requires work better with auto bundlers like vite"
+    ],
+    [
+      181,
+      "6c618417811fc2bc9b8783846eb7cb999dc856aa",
+      "CLOSED",
+      "migrate dependency of GitHub Actions"
+    ],
+    [
+      182,
+      "f287dfe7d785c5357a7b05c7974532134a007522",
+      "MERGED",
+      "CI: Upgrade GitHub actions"
+    ],
+    [
+      186,
+      "91a5b36d58fb869cb8ba343fc6efd022bf40c3b6",
+      "OPEN",
+      "Introduce initial friends module"
+    ],
+    [
+      189,
+      "1820af2fe98119c9ae38c5777653c3752a06d1fd",
+      "CLOSED",
+      "Bump version to publish latest to npm"
+    ],
+    [
+      190,
+      "9735d6a8f752e40356d8ecac05c158ddfed346c8",
+      "OPEN",
+      "add prepare script"
+    ],
+    [
+      191,
+      "aead039a6cdbd02f93841b8d2c93b0bd34e91d94",
+      "OPEN",
+      "add fileType argument to workshop.createItem"
+    ],
+    [
+      196,
+      "bdedd8c3929b3f4d850075a6d22270d78ce718e4",
+      "OPEN",
+      "Upgrade to steamworks-rs v0.12.1"
+    ],
+    [
+      198,
+      "1eb3fc52bc79feffb944011eff21554330a3b885",
+      "OPEN",
+      "Leaderboards API integration"
+    ],
+    [
+      200,
+      "16ff1b05a425872ecf6c0dfcbdde5a90b4edf21e",
+      "CLOSED",
+      "Add isOverlayEnabled"
+    ],
+    [
+      201,
+      "e84de4e810c23bb6844f4fc4cf44555cdbbe5f10",
+      "CLOSED",
+      "add screenshot to library"
+    ],
+    [
+      203,
+      "206fc5be6aff62eb62286c417c3547c6e8559939",
+      "OPEN",
+      "Feat: Detect Steam overlay availability"
+    ],
+    [
+      204,
+      "39d1a60f0b579c28354c3625aabdd9980aa5f04c",
+      "CLOSED",
+      "Set return additional previews"
+    ],
+    [
+      205,
+      "044f98a6920881b5dff9ce87b98900746cc194e2",
+      "OPEN",
+      "Added GameOverlayActivated to SteamCallbacks"
+    ],
+    [
+      207,
+      "e3b2034c23859c0fdc773a18c7dac9de53c31c7f",
+      "OPEN",
+      "API: Check if a file is persisted in the Steam Cloud and get file timestamp"
+    ],
+    [
+      208,
+      "1422c818e9089ee3652a0b61d3e2e28e13c5cf5d",
+      "OPEN",
+      "Add Steam Leaderboards bindings"
+    ],
+    [
+      209,
+      "5891c17f702c971a0b3c817067e7c3643fed11ec",
+      "OPEN",
+      "Add ISteamInventory bindings"
+    ],
+    [
+      210,
+      "d85ff5b150a6d6712f66c25a49c0baaeeec21952",
+      "OPEN",
+      "Add lobby chat: sendChatMessage, getChatEntry and the LobbyChatMsg callback"
+    ],
+    [
+      211,
+      "5703b347f6ff813cb24d83553a38f30c1971a52f",
+      "OPEN",
+      "Add friends.getPersona and friends.requestUserInformation"
+    ]
+  ],
+  "issues": [
+    [
+      1,
+      "CLOSED",
+      "First tests"
+    ],
+    [
+      6,
+      "CLOSED",
+      "Feature request: get app install dir"
+    ],
+    [
+      12,
+      "CLOSED",
+      "Is Steam overlay possible with the current Electron version?"
+    ],
+    [
+      14,
+      "CLOSED",
+      "Building for all targets"
+    ],
+    [
+      15,
+      "CLOSED",
+      "Check Achievement"
+    ],
+    [
+      16,
+      "CLOSED",
+      "Auth API"
+    ],
+    [
+      18,
+      "CLOSED",
+      "arm64 support"
+    ],
+    [
+      19,
+      "CLOSED",
+      "TypeScript typings not found: missing \"tyipings/types\" declaration in `package.json`?"
+    ],
+    [
+      21,
+      "CLOSED",
+      "'appId' in 'init' function should be optional in TypeScript typings."
+    ],
+    [
+      22,
+      "CLOSED",
+      "`.init()` works on initial load, but not on subsequent reloads"
+    ],
+    [
+      23,
+      "CLOSED",
+      "Steam Overlay only works when devtools is open"
+    ],
+    [
+      24,
+      "CLOSED",
+      "Support RestartAppIfNecessary"
+    ],
+    [
+      25,
+      "CLOSED",
+      "ISteamApps API"
+    ],
+    [
+      26,
+      "CLOSED",
+      "Document cross-compiling"
+    ],
+    [
+      33,
+      "CLOSED",
+      "Convince Valve to link to steamworks.js"
+    ],
+    [
+      34,
+      "CLOSED",
+      "API doesn't match steamworks-rs or C++ API; hard to find documentation"
+    ],
+    [
+      35,
+      "OPEN",
+      "Remote storage functions should return promises"
+    ],
+    [
+      36,
+      "CLOSED",
+      "`readFile` doesn't throw an error when the file doesn't exist"
+    ],
+    [
+      38,
+      "CLOSED",
+      "Understand library dependencies"
+    ],
+    [
+      39,
+      "OPEN",
+      "Tag releases in Github"
+    ],
+    [
+      40,
+      "CLOSED",
+      "Support inviting steam friends"
+    ],
+    [
+      41,
+      "OPEN",
+      "Improve documentation"
+    ],
+    [
+      42,
+      "OPEN",
+      "Error running app on Steam Deck"
+    ],
+    [
+      44,
+      "CLOSED",
+      "Issue with cloud.writeFile"
+    ],
+    [
+      45,
+      "CLOSED",
+      "Add automated build for Apple Silicon processors"
+    ],
+    [
+      46,
+      "CLOSED",
+      "Run on Tauri apps?"
+    ],
+    [
+      47,
+      "OPEN",
+      "Feature Request: Callback for GameOverlayActivated"
+    ],
+    [
+      48,
+      "CLOSED",
+      "Feature request: add `MicroTxnAuthorizationResponse_t` to callbacks"
+    ],
+    [
+      50,
+      "OPEN",
+      "Steam Overlay doesn't seem to work for Mac"
+    ],
+    [
+      51,
+      "CLOSED",
+      "Incompatibility with Electron 21"
+    ],
+    [
+      52,
+      "CLOSED",
+      "Server-side checking of credentials"
+    ],
+    [
+      53,
+      "CLOSED",
+      "How can I get actionSetName?"
+    ],
+    [
+      54,
+      "CLOSED",
+      "Shut down client (detach)"
+    ],
+    [
+      55,
+      "OPEN",
+      "Feature Request: Steam Inventory Support"
+    ],
+    [
+      56,
+      "OPEN",
+      "Feature Request: Support steam input glyph fetching."
+    ],
+    [
+      57,
+      "CLOSED",
+      "Issue with client.apps being undefined"
+    ],
+    [
+      59,
+      "CLOSED",
+      "Crash: panicked at 'called `Result::unwrap()` on an `Err` value: RecvError(())', src\\api\\auth.rs:62:40"
+    ],
+    [
+      60,
+      "CLOSED",
+      "Accuracy loss"
+    ],
+    [
+      61,
+      "OPEN",
+      "Possible to use steamworks.js with nwjs on Windows?"
+    ],
+    [
+      62,
+      "CLOSED",
+      "Testing using contextIsolation = true for Electron"
+    ],
+    [
+      63,
+      "CLOSED",
+      "Steam Overlay not working"
+    ],
+    [
+      64,
+      "CLOSED",
+      "macOS NAPI Buffer error"
+    ],
+    [
+      65,
+      "CLOSED",
+      "failed to init the steamworks API on basic installation"
+    ],
+    [
+      67,
+      "CLOSED",
+      "Is there a minimal example project?"
+    ],
+    [
+      68,
+      "CLOSED",
+      "Angular start cause error"
+    ],
+    [
+      69,
+      "CLOSED",
+      "How can I call the ClearAchievement interface？"
+    ],
+    [
+      70,
+      "CLOSED",
+      "How to set achievement?"
+    ],
+    [
+      71,
+      "CLOSED",
+      "Tauri integration"
+    ],
+    [
+      72,
+      "CLOSED",
+      "Add an overwrite for createItem(appId)"
+    ],
+    [
+      75,
+      "OPEN",
+      "Can't find binaries on windows + electron-forge"
+    ],
+    [
+      76,
+      "CLOSED",
+      "Feature Request: Utils"
+    ],
+    [
+      77,
+      "CLOSED",
+      "Callback is dropped if handle variable is not used"
+    ],
+    [
+      79,
+      "CLOSED",
+      "Feature Request: Activate Steam overlay"
+    ],
+    [
+      80,
+      "CLOSED",
+      "Failed build: use of undeclared type `FromNapiValue`"
+    ],
+    [
+      83,
+      "CLOSED",
+      "client.d.ts is being generated with two copies of every function"
+    ],
+    [
+      86,
+      "OPEN",
+      "Feature Request: Additional ISteamUserStats Interfaces"
+    ],
+    [
+      87,
+      "CLOSED",
+      "Feature Request: add visibility as an option to UgcUpdate"
+    ],
+    [
+      88,
+      "CLOSED",
+      "Push a 0.1.1 release"
+    ],
+    [
+      89,
+      "OPEN",
+      "Feature request: Leaderboard APIs & Achievement clear rates"
+    ],
+    [
+      90,
+      "OPEN",
+      "Mark the networking module as deprecated"
+    ],
+    [
+      91,
+      "CLOSED",
+      "how to build an assembly in a dist folder"
+    ],
+    [
+      93,
+      "CLOSED",
+      "Steamworks SDK v1.5.2 is required for init() to work on darwin x64"
+    ],
+    [
+      94,
+      "OPEN",
+      "Steam overlay on Ubuntu + KDE"
+    ],
+    [
+      95,
+      "OPEN",
+      "Alt-tabbing sometimes creates duplicate \"ghost\" windows"
+    ],
+    [
+      97,
+      "CLOSED",
+      "Steam Overlay not working at all"
+    ],
+    [
+      99,
+      "CLOSED",
+      "ISteamMicroTxn/InitTxn not Opening Overlay"
+    ],
+    [
+      100,
+      "CLOSED",
+      "GetSubscribedItems?"
+    ],
+    [
+      101,
+      "CLOSED",
+      "Publish a 0.2.1 release"
+    ],
+    [
+      102,
+      "OPEN",
+      "Steam Overlay Hint not showing"
+    ],
+    [
+      103,
+      "CLOSED",
+      "macOS code signing failing because \"larger updated load commands do not fit (the program must be relinked using a larger -headerpad value)\""
+    ],
+    [
+      104,
+      "OPEN",
+      "Feature Request: ISteamFriends::GetLargeFriendAvatar/ISteamFriends::GetMediumFriendAvatar"
+    ],
+    [
+      105,
+      "CLOSED",
+      "steam_appid.txt presence should not be mandatory when app ID is not specified"
+    ],
+    [
+      107,
+      "CLOSED",
+      "Error: access denied. code: 'Generic Failure' when calling updateItem() with previewPath and contentPath."
+    ],
+    [
+      108,
+      "CLOSED",
+      "HTML5 Gamepad API doesn't work when steamworks is used"
+    ],
+    [
+      109,
+      "CLOSED",
+      "Feature request: implement GetSubscribedItems"
+    ],
+    [
+      110,
+      "CLOSED",
+      "Feature request: implement CreateQueryUGCDetailsRequest"
+    ],
+    [
+      111,
+      "CLOSED",
+      "Error: failed to init the steamworks API"
+    ],
+    [
+      112,
+      "OPEN",
+      "require('steamworks.js').electronEnableSteamOverlay() silently crashes electron client"
+    ],
+    [
+      116,
+      "OPEN",
+      "Overlay shows as white in electron"
+    ],
+    [
+      118,
+      "CLOSED",
+      "Feature request: Implement ISteamUser::GetAuthTicketForWebApi"
+    ],
+    [
+      119,
+      "CLOSED",
+      "Can't start steamworks API"
+    ],
+    [
+      120,
+      "OPEN",
+      "Mac version crashes when launched from Steam but runs successfully from local .app."
+    ],
+    [
+      121,
+      "CLOSED",
+      "contextIsolation false or true? electronEnableSteamOverlay has to be called?"
+    ],
+    [
+      122,
+      "CLOSED",
+      "GLIBC 2.28?"
+    ],
+    [
+      123,
+      "OPEN",
+      "Signing issues on M1 macs"
+    ],
+    [
+      124,
+      "OPEN",
+      "Networking API"
+    ],
+    [
+      126,
+      "CLOSED",
+      "On require of steamworks.js, receiving Uncaught Error: Module did not self-register."
+    ],
+    [
+      127,
+      "CLOSED",
+      "Steam game runs forever"
+    ],
+    [
+      128,
+      "CLOSED",
+      "steamworks shutdown"
+    ],
+    [
+      129,
+      "CLOSED",
+      "steam_api64.dll dependency missing for production build"
+    ],
+    [
+      131,
+      "CLOSED",
+      "error when trying to require the steamworks.js with nw.js"
+    ],
+    [
+      132,
+      "OPEN",
+      "Leaderboard plz~"
+    ],
+    [
+      133,
+      "OPEN",
+      "SteamCloud cross-platform save - SetSyncPlatform"
+    ],
+    [
+      134,
+      "CLOSED",
+      "App running on steam"
+    ],
+    [
+      135,
+      "CLOSED",
+      "Detect when Steam Deck is Docked?"
+    ],
+    [
+      136,
+      "CLOSED",
+      "Cannot start electron app with or without asar"
+    ],
+    [
+      138,
+      "CLOSED",
+      "Zombie Session Ticket?"
+    ],
+    [
+      139,
+      "CLOSED",
+      "getAuthTicketForWebApi missing in package"
+    ],
+    [
+      141,
+      "CLOSED",
+      "client.apps.currentGameLanguage() always returns 'english'"
+    ],
+    [
+      144,
+      "OPEN",
+      "Is it possible to listen for the GameOverlayActivated_t event?"
+    ],
+    [
+      145,
+      "CLOSED",
+      "Is the setRichPresence function not working?"
+    ],
+    [
+      148,
+      "OPEN",
+      "Video tag breaks Steam Overlay"
+    ],
+    [
+      149,
+      "CLOSED",
+      "Electron Forge prod build can't load binary deps? (but dev build can)"
+    ],
+    [
+      150,
+      "CLOSED",
+      "Cant update progress achivement (stats"
+    ],
+    [
+      151,
+      "CLOSED",
+      "Steamworksjs interfering with WebGL"
+    ],
+    [
+      152,
+      "OPEN",
+      "Request for Integration of ISteamInventory Interface."
+    ],
+    [
+      153,
+      "OPEN",
+      "Unable to run electron.exe with asar enabled"
+    ],
+    [
+      154,
+      "CLOSED",
+      "Ability to differentiate controllers"
+    ],
+    [
+      156,
+      "OPEN",
+      "Issue on WIndows 11 - 'Specific module could not be found\" - steamworks.js"
+    ],
+    [
+      160,
+      "OPEN",
+      "Overlay not working"
+    ],
+    [
+      161,
+      "CLOSED",
+      "apps.appBuildId() returns 0"
+    ],
+    [
+      162,
+      "CLOSED",
+      "Changelog for versions"
+    ],
+    [
+      163,
+      "OPEN",
+      "please add delete_item in workshop"
+    ],
+    [
+      164,
+      "OPEN",
+      "Steam Inventory missing"
+    ],
+    [
+      165,
+      "OPEN",
+      "getSessionTicketWithSteamId Failing with Generic Error: GenericFailure channel closed."
+    ],
+    [
+      166,
+      "OPEN",
+      "Implement the rest of the iSteamInput API "
+    ],
+    [
+      167,
+      "OPEN",
+      "ISteamUtils::IsOverlayEnabled is needed"
+    ],
+    [
+      168,
+      "OPEN",
+      "set_lobby_list_filter  is needed"
+    ],
+    [
+      169,
+      "OPEN",
+      "Get friend count and data?"
+    ],
+    [
+      170,
+      "OPEN",
+      "Steam Leaderboards "
+    ],
+    [
+      171,
+      "OPEN",
+      "Add support for Shutting down client (detach)"
+    ],
+    [
+      173,
+      "CLOSED",
+      "Missing module Javascript error or some users"
+    ],
+    [
+      175,
+      "OPEN",
+      "Hello! I hope that when creating items in the Steam Workshop, it will be possible to set the item types."
+    ],
+    [
+      176,
+      "OPEN",
+      "Still active ? / How to contribute and enable PR here?"
+    ],
+    [
+      183,
+      "OPEN",
+      "Diff between github code and npm published version"
+    ],
+    [
+      184,
+      "CLOSED",
+      "Bless this project."
+    ],
+    [
+      185,
+      "OPEN",
+      "Not Steamworks.js issue but related"
+    ],
+    [
+      187,
+      "OPEN",
+      "Bump version in NPM"
+    ],
+    [
+      188,
+      "OPEN",
+      "Electron context isolation & node integration readme instruction suggested improvement"
+    ],
+    [
+      192,
+      "OPEN",
+      "Node Loader Issue?"
+    ],
+    [
+      193,
+      "OPEN",
+      "Which fork of this library is active?"
+    ],
+    [
+      194,
+      "OPEN",
+      "How to get a MacOS packaged build to run?"
+    ],
+    [
+      195,
+      "OPEN",
+      "Overlay Woes on Linux build (Electron.js)"
+    ],
+    [
+      197,
+      "OPEN",
+      "Workshop Upload returns error code 5 (k_EResultInvalidPassword)"
+    ],
+    [
+      199,
+      "OPEN",
+      "We need a official fork or new owners please!"
+    ],
+    [
+      202,
+      "OPEN",
+      "Is anyone able to get input working?"
+    ],
+    [
+      206,
+      "CLOSED",
+      "is it possible use with React Native ??"
+    ]
+  ]
+}

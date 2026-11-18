@@ -3,10 +3,13 @@ use napi_derive::napi;
 #[napi]
 pub mod matchmaking {
     use crate::api::localplayer::PlayerSteamId;
-    use napi::bindgen_prelude::{BigInt, Error};
+    use napi::bindgen_prelude::{BigInt, Buffer, Error};
     use std::collections::HashMap;
-    use steamworks::LobbyId;
+    use std::ffi::{CStr, CString};
+    use steamworks::{sys, LobbyId};
     use tokio::sync::oneshot;
+
+    const LOBBY_CHAT_MSG_MAX: usize = 4096;
 
     #[napi]
     pub enum LobbyType {
@@ -14,6 +17,165 @@ pub mod matchmaking {
         FriendsOnly,
         Public,
         Invisible,
+    }
+
+    #[napi]
+    pub enum LobbyComparison {
+        Equal,
+        NotEqual,
+        GreaterThan,
+        GreaterThanOrEqual,
+        LessThan,
+        LessThanOrEqual,
+    }
+
+    impl From<LobbyComparison> for sys::ELobbyComparison {
+        fn from(value: LobbyComparison) -> Self {
+            match value {
+                LobbyComparison::Equal => Self::k_ELobbyComparisonEqual,
+                LobbyComparison::NotEqual => Self::k_ELobbyComparisonNotEqual,
+                LobbyComparison::GreaterThan => Self::k_ELobbyComparisonGreaterThan,
+                LobbyComparison::GreaterThanOrEqual => Self::k_ELobbyComparisonEqualToOrGreaterThan,
+                LobbyComparison::LessThan => Self::k_ELobbyComparisonLessThan,
+                LobbyComparison::LessThanOrEqual => Self::k_ELobbyComparisonEqualToOrLessThan,
+            }
+        }
+    }
+
+    #[napi]
+    pub enum LobbyDistance {
+        Close,
+        Default,
+        Far,
+        Worldwide,
+    }
+
+    #[napi(object)]
+    pub struct LobbyStringFilter {
+        pub key: String,
+        pub value: String,
+        /// Defaults to Equal.
+        pub comparison: Option<LobbyComparison>,
+    }
+
+    #[napi(object)]
+    pub struct LobbyNumberFilter {
+        pub key: String,
+        pub value: i32,
+        pub comparison: LobbyComparison,
+    }
+
+    #[napi(object)]
+    pub struct LobbyNearFilter {
+        pub key: String,
+        pub value: i32,
+    }
+
+    #[napi(object)]
+    pub struct LobbyListFilter {
+        pub string_filters: Option<Vec<LobbyStringFilter>>,
+        pub number_filters: Option<Vec<LobbyNumberFilter>>,
+        /// Sort by proximity to these values, in priority order.
+        pub near_value_filters: Option<Vec<LobbyNearFilter>>,
+        pub slots_available: Option<u8>,
+        pub distance: Option<LobbyDistance>,
+        pub count: Option<i32>,
+    }
+
+    fn lobby_key(key: String) -> Result<CString, Error> {
+        if key.is_empty() || key.len() > sys::k_nMaxLobbyKeyLength as usize {
+            return Err(Error::from_reason("Lobby keys must contain 1 to 255 bytes"));
+        }
+        c_string(key)
+    }
+
+    fn c_string(value: String) -> Result<CString, Error> {
+        CString::new(value).map_err(|_| Error::from_reason("Unexpected NUL byte in lobby data"))
+    }
+
+    fn raw_matchmaking(_client: &steamworks::Client) -> Result<*mut sys::ISteamMatchmaking, Error> {
+        let mm = unsafe { sys::SteamAPI_SteamMatchmaking_v009() };
+        if mm.is_null() {
+            Err(Error::from_reason("Steam matchmaking unavailable"))
+        } else {
+            Ok(mm)
+        }
+    }
+
+    impl LobbyListFilter {
+        fn apply(self, client: &steamworks::Client) -> Result<(), Error> {
+            // Validate everything before changing Steam's pending filters; they cannot be rolled back.
+            let strings = self
+                .string_filters
+                .unwrap_or_default()
+                .into_iter()
+                .map(|f| {
+                    Ok((
+                        lobby_key(f.key)?,
+                        c_string(f.value)?,
+                        f.comparison.unwrap_or(LobbyComparison::Equal).into(),
+                    ))
+                })
+                .collect::<Result<Vec<_>, Error>>()?;
+            let numbers = self
+                .number_filters
+                .unwrap_or_default()
+                .into_iter()
+                .map(|f| Ok((lobby_key(f.key)?, f.value, f.comparison.into())))
+                .collect::<Result<Vec<_>, Error>>()?;
+            let near = self
+                .near_value_filters
+                .unwrap_or_default()
+                .into_iter()
+                .map(|f| Ok((lobby_key(f.key)?, f.value)))
+                .collect::<Result<Vec<_>, Error>>()?;
+            if self.count.is_some_and(|count| count < 0) {
+                return Err(Error::from_reason("Lobby result count must be nonnegative"));
+            }
+            let mm = raw_matchmaking(client)?;
+            // fbb7963's string/number/near wrappers pass str.as_ptr() without a terminating NUL.
+            unsafe {
+                for (key, value, cmp) in strings {
+                    sys::SteamAPI_ISteamMatchmaking_AddRequestLobbyListStringFilter(
+                        mm,
+                        key.as_ptr(),
+                        value.as_ptr(),
+                        cmp,
+                    );
+                }
+                for (key, value, cmp) in numbers {
+                    sys::SteamAPI_ISteamMatchmaking_AddRequestLobbyListNumericalFilter(
+                        mm,
+                        key.as_ptr(),
+                        value,
+                        cmp,
+                    );
+                }
+                for (key, value) in near {
+                    sys::SteamAPI_ISteamMatchmaking_AddRequestLobbyListNearValueFilter(
+                        mm,
+                        key.as_ptr(),
+                        value,
+                    );
+                }
+            }
+            let matchmaking = client.matchmaking();
+            if let Some(slots) = self.slots_available {
+                matchmaking.set_request_lobby_list_slots_available_filter(slots);
+            }
+            if let Some(count) = self.count {
+                matchmaking.set_request_lobby_list_result_count_filter(count as u64);
+            }
+            if let Some(distance) = self.distance {
+                matchmaking.set_request_lobby_list_distance_filter(match distance {
+                    LobbyDistance::Close => steamworks::DistanceFilter::Close,
+                    LobbyDistance::Default => steamworks::DistanceFilter::Default,
+                    LobbyDistance::Far => steamworks::DistanceFilter::Far,
+                    LobbyDistance::Worldwide => steamworks::DistanceFilter::Worldwide,
+                });
+            }
+            Ok(())
+        }
     }
 
     #[napi]
@@ -39,6 +201,31 @@ pub mod matchmaking {
         pub fn open_invite_dialog(&self) {
             let client = crate::client::get_client();
             client.friends().activate_invite_dialog(self.lobby_id);
+        }
+
+        /// Broadcast up to 4096 bytes to the lobby, including the sender.
+        #[napi]
+        pub fn send_chat_message(&self, message: Buffer) -> Result<(), Error> {
+            if !(1..=LOBBY_CHAT_MSG_MAX).contains(&message.len()) {
+                return Err(Error::from_reason(
+                    "Lobby chat messages must contain 1 to 4096 bytes",
+                ));
+            }
+            crate::client::get_client()
+                .matchmaking()
+                .send_lobby_chat_message(self.lobby_id, &message)
+                .map_err(|e| Error::from_reason(e.to_string()))
+        }
+
+        /// Read the bytes identified by a LobbyChatMsg callback. Missing entries return an empty buffer.
+        #[napi]
+        pub fn get_chat_entry(&self, chat_id: i32) -> Buffer {
+            let mut buffer = [0u8; LOBBY_CHAT_MSG_MAX];
+            crate::client::get_client()
+                .matchmaking()
+                .get_lobby_chat_entry(self.lobby_id, chat_id, &mut buffer)
+                .to_vec()
+                .into()
         }
 
         #[napi]
@@ -68,6 +255,53 @@ pub mod matchmaking {
         pub fn get_owner(&self) -> PlayerSteamId {
             let client = crate::client::get_client();
             PlayerSteamId::from_steamid(client.matchmaking().lobby_owner(self.lobby_id))
+        }
+
+        /// Set metadata for the local member, not for the lobby itself.
+        #[napi]
+        pub fn set_member_data(&self, key: String, value: String) -> Result<(), Error> {
+            let key = lobby_key(key)?;
+            let value = c_string(value)?;
+            let client = crate::client::get_client();
+            unsafe {
+                sys::SteamAPI_ISteamMatchmaking_SetLobbyMemberData(
+                    raw_matchmaking(&client)?,
+                    self.lobby_id.raw(),
+                    key.as_ptr(),
+                    value.as_ptr(),
+                )
+            };
+            Ok(())
+        }
+
+        /// Steam does not distinguish a missing member value from an empty one.
+        #[napi]
+        pub fn get_member_data(
+            &self,
+            steam_id64: BigInt,
+            key: String,
+        ) -> Result<Option<String>, Error> {
+            let key = lobby_key(key)?;
+            let (_, id, lossless) = steam_id64.get_u64();
+            if !lossless {
+                return Err(Error::from_reason(
+                    "steamId64 must be an unsigned 64-bit integer",
+                ));
+            }
+            let client = crate::client::get_client();
+            unsafe {
+                let ptr = sys::SteamAPI_ISteamMatchmaking_GetLobbyMemberData(
+                    raw_matchmaking(&client)?,
+                    self.lobby_id.raw(),
+                    id,
+                    key.as_ptr(),
+                );
+                if ptr.is_null() {
+                    return Ok(None);
+                }
+                let value = CStr::from_ptr(ptr);
+                Ok((!value.to_bytes().is_empty()).then(|| value.to_string_lossy().into_owned()))
+            }
         }
 
         #[napi]
@@ -182,17 +416,25 @@ pub mod matchmaking {
     }
 
     #[napi]
-    pub async fn get_lobbies() -> Result<Vec<Lobby>, Error> {
+    pub async fn get_lobbies(filter: Option<LobbyListFilter>) -> Result<Vec<Lobby>, Error> {
+        // RequestLobbyList cancels the preceding search if its callback hasn't fired yet.
+        static SEARCH: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+        let _search = SEARCH.lock().await;
         let client = crate::client::get_client();
+        if let Some(filter) = filter {
+            filter.apply(&client)?;
+        }
 
         let (tx, rx) = oneshot::channel();
 
-        client.matchmaking().request_lobby_list(|lobbies| {
-            tx.send(lobbies).unwrap();
+        client.matchmaking().request_lobby_list(move |lobbies| {
+            let _ = tx.send(lobbies);
         });
 
-        rx.await
-            .unwrap()
+        tokio::time::timeout(std::time::Duration::from_secs(30), rx)
+            .await
+            .map_err(|_| Error::from_reason("Timed out waiting for Steam lobby search"))?
+            .map_err(|_| Error::from_reason("Lobby search callback dropped"))?
             .map(|lobbies| {
                 lobbies
                     .iter()

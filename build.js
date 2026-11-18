@@ -47,12 +47,10 @@ const params = [
     '--js', 'false',
     '--dts', '../../client.d.ts',
     relative,
-    process.argv.slice(2).join(' ')
+    ...process.argv.slice(2)
 ]
 
-child_process.spawn('napi', params, { stdio: 'inherit', shell: true })
-    .on('exit', err => {
-        if (err) {
-            throw err;
-        }
-    })
+child_process.execFileSync(process.execPath, [require.resolve('@napi-rs/cli/scripts/index.js'), ...params], { stdio: 'inherit' })
+child_process.execFileSync(process.execPath, [
+    require.resolve('typescript/bin/tsc'), 'index.js', '--allowJs', '--declaration', '--emitDeclarationOnly'
+], { stdio: 'inherit' })

@@ -2,7 +2,8 @@ use napi_derive::napi;
 
 #[napi]
 pub mod cloud {
-    use napi::bindgen_prelude::{BigInt, Error};
+    use napi::bindgen_prelude::{BigInt, Buffer, Error};
+    use napi::Env;
     use std::io::Read;
     use std::io::Write;
 
@@ -69,6 +70,68 @@ pub mod cloud {
         let file = client.remote_storage().file(&name);
 
         file.exists()
+    }
+
+    #[napi]
+    pub fn is_file_persisted(name: String) -> bool {
+        let client = crate::client::get_client();
+        let file = client.remote_storage().file(&name);
+
+        file.is_persisted()
+    }
+
+    #[napi]
+    pub fn file_timestamp(name: String) -> i64 {
+        let client = crate::client::get_client();
+        let file = client.remote_storage().file(&name);
+
+        file.timestamp()
+    }
+
+    /// Read binary save data without blocking the Node event loop.
+    #[napi]
+    pub async fn read_file_bytes(name: String) -> Result<Buffer, Error> {
+        check_name(&name)?;
+        tokio::task::spawn_blocking(move || {
+            let file = crate::client::get_client().remote_storage().file(&name);
+            if !file.exists() {
+                return Err(Error::from_reason("Cloud file does not exist"));
+            }
+            let mut bytes = Vec::new();
+            file.read()
+                .read_to_end(&mut bytes)
+                .map_err(|e| Error::from_reason(e.to_string()))?;
+            Ok(bytes.into())
+        })
+        .await
+        .map_err(|e| Error::from_reason(e.to_string()))?
+    }
+
+    #[napi(ts_return_type = "Promise<void>")]
+    pub fn write_file_bytes(env: Env, name: String, data: Buffer) -> Result<napi::JsObject, Error> {
+        let bytes = data.to_vec();
+        env.spawn_future(async move {
+            check_name(&name)?;
+            tokio::task::spawn_blocking(move || {
+                crate::client::get_client()
+                    .remote_storage()
+                    .file(&name)
+                    .write()
+                    .write_all(&bytes)
+                    .map_err(|e| Error::from_reason(e.to_string()))
+            })
+            .await
+            .map_err(|e| Error::from_reason(e.to_string()))?
+        })
+    }
+
+    fn check_name(name: &str) -> Result<(), Error> {
+        if name.is_empty() || name.contains('\0') {
+            return Err(Error::from_reason(
+                "Expected a non-empty cloud filename without NUL bytes",
+            ));
+        }
+        Ok(())
     }
 
     #[napi]

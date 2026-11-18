@@ -43,6 +43,16 @@ pub mod localplayer {
         client.user().level()
     }
 
+    #[napi]
+    pub fn is_logged_on() -> bool {
+        crate::client::get_client().user().logged_on()
+    }
+
+    #[napi]
+    pub fn clear_rich_presence() {
+        crate::client::get_client().friends().clear_rich_presence();
+    }
+
     /// @returns the 2 digit ISO 3166-1-alpha-2 format country code which client is running in, e.g. "US" or "UK".
     #[napi]
     pub fn get_ip_country() -> String {

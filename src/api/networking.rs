@@ -67,6 +67,11 @@ pub mod networking {
 
     #[napi]
     pub fn read_p2p_packet(size: i32) -> Result<P2PPacket, Error> {
+        if !(0..=1_048_576).contains(&size) {
+            return Err(Error::from_reason(
+                "Expected a packet size between 0 and 1048576 bytes",
+            ));
+        }
         let client = crate::client::get_client();
         let mut buffer = vec![0; size as usize];
 
@@ -92,5 +97,12 @@ pub mod networking {
         client
             .networking()
             .accept_p2p_session(SteamId::from_raw(steam_id64.get_u64().1));
+    }
+
+    #[napi]
+    pub fn close_p2p_session(steam_id64: BigInt) {
+        crate::client::get_client()
+            .networking()
+            .close_p2p_session(SteamId::from_raw(steam_id64.get_u64().1));
     }
 }

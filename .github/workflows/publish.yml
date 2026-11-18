@@ -4,6 +4,10 @@ on:
     push:
         branches: [main]
     pull_request:
+    workflow_dispatch:
+
+permissions:
+    contents: read
 
 env:
     DEBUG: 'napi:*'
@@ -52,30 +56,52 @@ jobs:
               uses: dtolnay/rust-toolchain@stable
               with:
                   toolchain: stable
-                  targets: x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu
+                  targets: x86_64-unknown-linux-gnu
 
             - uses: Swatinem/rust-cache@v2
-
-            - run: cargo install cargo-xwin
 
             - name: Node install
               run: pnpm install --frozen-lockfile
 
             - name: Build Linux
-              run: pnpm run build --target x86_64-unknown-linux-gnu
+              run: |
+                  rm client.d.ts index.d.ts
+                  pnpm run build --target x86_64-unknown-linux-gnu
+                  test -s client.d.ts && test -s index.d.ts
 
-            - name: Build Windows
-              run: pnpm run build --target x86_64-pc-windows-msvc
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: declarations
+                  path: '*.d.ts'
+                  if-no-files-found: error
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: binaries-windows-linux
+                  name: binaries-linux
+                  path: dist
+                  if-no-files-found: error
+
+    build-windows:
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22.x
+            - uses: dtolnay/rust-toolchain@stable
+            - uses: Swatinem/rust-cache@v2
+            - run: pnpm install --frozen-lockfile
+            - run: pnpm run build --target x86_64-pc-windows-msvc
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: binaries-windows
                   path: dist
                   if-no-files-found: error
 
     build-mac:
-        runs-on: macos-latest
+        runs-on: macos-15-intel
 
         steps:
             - uses: actions/checkout@v4
@@ -110,40 +136,121 @@ jobs:
                   path: dist
                   if-no-files-found: error
 
-    deploy:
-        # prevents this action from running on forks or pull requests
-        if: ${{ github.repository == 'ceifa/steamworks.js' && github.event_name == 'push' }}
-
+    package:
         runs-on: ubuntu-latest
-        needs: [build, build-mac]
-
+        needs: [check, build, build-windows, build-mac]
         steps:
             - uses: actions/checkout@v4
-
-            - name: Download build
-              uses: actions/download-artifact@v4
+            - uses: pnpm/action-setup@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22.x
+            - uses: actions/download-artifact@v4
               with:
                   path: dist/
                   pattern: binaries-*
                   merge-multiple: true
-
-            - name: Log files
+            - uses: actions/download-artifact@v4
+              with:
+                  name: declarations
+            - run: pnpm install --frozen-lockfile
+            - run: pnpm --dir test/typescript run compile
+            - name: Pack and verify the release payload
               run: |
-                  echo "- Root directory:" && ls
-                  echo "- Dist directory:" && ls -R dist
+                  pnpm pack --pack-destination "$RUNNER_TEMP"
+                  mkdir "$RUNNER_TEMP/packed"
+                  tar -xzf "$RUNNER_TEMP"/*.tgz -C "$RUNNER_TEMP/packed"
+                  cd "$RUNNER_TEMP/packed/package"
+                  for file in CHANGELOG.md index.js index.d.ts client.d.ts callbacks.d.ts \
+                    dist/linux64/{steamworksjs.linux-x64-gnu.node,libsteam_api.so} \
+                    dist/win64/{steamworksjs.win32-x64-msvc.node,steam_api64.dll} \
+                    dist/osx/{steamworksjs.darwin-x64.node,steamworksjs.darwin-arm64.node,libsteam_api.dylib}; do
+                      test -s "$file" || { echo "Missing $file"; exit 1; }
+                  done
+                  node "$GITHUB_WORKSPACE/test/package-smoke.js" "$PWD"
+                  mkdir "$RUNNER_TEMP/consumer"
+                  cd "$RUNNER_TEMP/consumer"
+                  echo '{"private":true}' > package.json
+                  pnpm add --offline "$RUNNER_TEMP"/*.tgz
+                  cp "$GITHUB_WORKSPACE/test/typescript/index.ts" .
+                  "$GITHUB_WORKSPACE/node_modules/.bin/tsc" --strict --noEmit index.ts
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: npm-package
+                  path: ${{ runner.temp }}/*.tgz
+                  if-no-files-found: error
 
-            - name: Publish to npm
-              uses: JS-DevTools/npm-publish@v3
+    verify-package:
+        needs: package
+        strategy:
+            matrix:
+                os: [windows-latest, macos-latest, macos-15-intel]
+        runs-on: ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
               with:
-                  token: ${{ secrets.NPM_TOKEN }}
-                
-            - name: Create Release
-              id: create_release
-              uses: softprops/action-gh-release@v2
+                  node-version: 22.x
+            - uses: actions/download-artifact@v4
+              with:
+                  name: npm-package
+            - shell: bash
+              run: |
+                  tar -xzf ./*.tgz
+                  node test/package-smoke.js package
+
+    release:
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        needs: verify-package
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            pull-requests: write
+        outputs:
+            sha: ${{ steps.release.outputs.sha }}
+            tag: ${{ steps.release.outputs.tag_name }}
+        steps:
+            - id: release
+              uses: googleapis/release-please-action@v4
+            - if: steps.release.outputs.sha == github.sha
+              uses: actions/download-artifact@v4
+              with:
+                  name: npm-package
+            - if: steps.release.outputs.sha == github.sha
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GH_TOKEN: ${{ github.token }}
+                  TAG: ${{ steps.release.outputs.tag_name }}
+              run: gh release upload "$TAG" ./*.tgz --repo "$GITHUB_REPOSITORY"
+
+    publish:
+        needs: [verify-package, release]
+        if: >-
+            always() && needs.verify-package.result == 'success' &&
+            ((needs.release.result == 'success' && needs.release.outputs.sha == github.sha) ||
+             (github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')))
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            id-token: write
+        steps:
+            - uses: actions/setup-node@v4
               with:
-                  name: Release v${{ steps.publish.outputs.version }}
-                  tag_name: v${{ steps.publish.outputs.version }}
-                  generate_release_notes: true
-                  draft: false
+                  node-version: 24.x
+                  registry-url: https://registry.npmjs.org
+            - name: Publish verified tarball
+              env:
+                  TAG: ${{ needs.release.outputs.tag || github.ref_name }}
+                  GH_TOKEN: ${{ github.token }}
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+              run: |
+                  gh release download "$TAG" --pattern '*.tgz' --repo "$GITHUB_REPOSITORY"
+                  tar -xOzf ./*.tgz package/package.json > manifest.json
+                  node -e "const p = require('./manifest.json'); if (p.name !== '@kyeshmz/steamworks.js' || 'v' + p.version !== process.env.TAG) process.exit(1)"
+                  status=$(curl --silent --show-error -o registry.json -w '%{http_code}' \
+                      "https://registry.npmjs.org/@kyeshmz%2fsteamworks.js/${TAG#v}")
+                  case "$status" in
+                    404) npm publish ./*.tgz --access public --provenance ;;
+                    200) expected="sha512-$(openssl dgst -sha512 -binary ./*.tgz | openssl base64 -A)"
+                         test "$(jq -r '.dist.integrity' registry.json)" = "$expected" ;;
+                    *) echo "Could not check npm version: HTTP $status"; exit 1 ;;
+                  esac

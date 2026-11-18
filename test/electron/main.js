@@ -1,13 +1,16 @@
-const { app, BrowserWindow } = require('electron')
-const steamworks = require('steamworks.js')
+const { app, BrowserWindow, ipcMain } = require('electron')
+const path = require('node:path')
+const steamworks = require('@kyeshmz/steamworks.js')
 
 function createWindow() {
     const mainWindow = new BrowserWindow({
         width: 800,
         height: 600,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
         }
     })
 
@@ -23,6 +26,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+    const client = steamworks.init(480)
+    ipcMain.handle('steam:player-name', () => client.localplayer.getName())
+    ipcMain.handle('steam:example-overlay', () => client.overlay.activateToWebPage('https://www.example.com/'))
     createWindow()
 
     app.on('activate', function () {

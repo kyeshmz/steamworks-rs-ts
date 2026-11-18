@@ -2,7 +2,60 @@ use napi_derive::napi;
 
 #[napi]
 pub mod input {
-    use napi::bindgen_prelude::BigInt;
+    use napi::bindgen_prelude::{BigInt, Error};
+    use std::ffi::CStr;
+    use steamworks::sys;
+
+    fn action_handle(value: &BigInt) -> Result<u64, Error> {
+        match value.words.as_slice() {
+            [word] if !value.sign_bit => Ok(*word),
+            [] if !value.sign_bit => Ok(0),
+            _ => Err(Error::from_reason(
+                "Expected an unsigned 64-bit input handle",
+            )),
+        }
+    }
+
+    fn with_input<T>(call: impl FnOnce(*mut sys::ISteamInput) -> T) -> Result<T, Error> {
+        let _client = crate::client::get_client();
+        let input = unsafe { sys::SteamAPI_SteamInput_v006() };
+        if input.is_null() {
+            return Err(Error::from_reason("Steam Input unavailable"));
+        }
+        Ok(call(input))
+    }
+
+    fn action_origin(value: f64) -> Result<sys::EInputActionOrigin, Error> {
+        const COUNT: u32 = sys::EInputActionOrigin::k_EInputActionOrigin_Count as u32;
+        const _: () = assert!(COUNT == 406);
+        if value.fract() != 0.0 || !(0.0..COUNT as f64).contains(&value) {
+            return Err(Error::from_reason("Unknown Steam Input action origin"));
+        }
+        // All three fbb7963 binding targets define every discriminant from 0 through 405.
+        Ok(unsafe { std::mem::transmute::<u32, sys::EInputActionOrigin>(value as u32) })
+    }
+
+    unsafe fn copy_text(ptr: *const std::ffi::c_char) -> String {
+        if ptr.is_null() {
+            String::new()
+        } else {
+            CStr::from_ptr(ptr).to_string_lossy().into_owned()
+        }
+    }
+
+    #[napi]
+    pub enum GlyphSize {
+        Small,
+        Medium,
+        Large,
+    }
+
+    #[napi]
+    pub enum HapticLocation {
+        Left,
+        Right,
+        Both,
+    }
 
     #[napi(string_enum)]
     pub enum InputType {
@@ -50,6 +103,38 @@ pub mod input {
         pub(crate) handle: BigInt,
     }
 
+    impl Controller {
+        fn action_origins(
+            &self,
+            action_set: BigInt,
+            action: BigInt,
+            get: unsafe extern "C" fn(
+                *mut sys::ISteamInput,
+                u64,
+                u64,
+                u64,
+                *mut sys::EInputActionOrigin,
+            ) -> i32,
+        ) -> Result<Vec<u32>, Error> {
+            let action_set = action_handle(&action_set)?;
+            let action = action_handle(&action)?;
+            with_input(|input| {
+                // Newer Steam clients can return origins not represented by the pinned Rust enum.
+                let mut origins = [0u32; sys::STEAM_INPUT_MAX_ORIGINS as usize];
+                let n = unsafe {
+                    get(
+                        input,
+                        self.handle.get_u64().1,
+                        action_set,
+                        action,
+                        origins.as_mut_ptr().cast(),
+                    )
+                };
+                origins.into_iter().take(n.max(0) as usize).collect()
+            })
+        }
+    }
+
     #[napi]
     impl Controller {
         #[napi]
@@ -94,6 +179,146 @@ pub mod input {
         pub fn get_handle(&self) -> BigInt {
             self.handle.clone()
         }
+
+        #[napi]
+        pub fn get_digital_action_origins(
+            &self,
+            action_set: BigInt,
+            action: BigInt,
+        ) -> Result<Vec<u32>, Error> {
+            self.action_origins(
+                action_set,
+                action,
+                sys::SteamAPI_ISteamInput_GetDigitalActionOrigins,
+            )
+        }
+
+        #[napi]
+        pub fn get_analog_action_origins(
+            &self,
+            action_set: BigInt,
+            action: BigInt,
+        ) -> Result<Vec<u32>, Error> {
+            self.action_origins(
+                action_set,
+                action,
+                sys::SteamAPI_ISteamInput_GetAnalogActionOrigins,
+            )
+        }
+
+        #[napi]
+        pub fn show_binding_panel(&self) -> bool {
+            crate::client::get_client()
+                .input()
+                .show_binding_panel(self.handle.get_u64().1)
+        }
+
+        #[napi]
+        pub fn get_current_action_set(&self) -> Result<BigInt, Error> {
+            with_input(|input| unsafe {
+                sys::SteamAPI_ISteamInput_GetCurrentActionSet(input, self.handle.get_u64().1).into()
+            })
+        }
+
+        #[napi]
+        pub fn activate_action_set_layer(&self, layer: BigInt) -> Result<(), Error> {
+            let layer = action_handle(&layer)?;
+            with_input(|input| unsafe {
+                sys::SteamAPI_ISteamInput_ActivateActionSetLayer(
+                    input,
+                    self.handle.get_u64().1,
+                    layer,
+                )
+            })
+        }
+
+        #[napi]
+        pub fn deactivate_action_set_layer(&self, layer: BigInt) -> Result<(), Error> {
+            let layer = action_handle(&layer)?;
+            with_input(|input| unsafe {
+                sys::SteamAPI_ISteamInput_DeactivateActionSetLayer(
+                    input,
+                    self.handle.get_u64().1,
+                    layer,
+                )
+            })
+        }
+
+        #[napi]
+        pub fn deactivate_all_action_set_layers(&self) -> Result<(), Error> {
+            with_input(|input| unsafe {
+                sys::SteamAPI_ISteamInput_DeactivateAllActionSetLayers(
+                    input,
+                    self.handle.get_u64().1,
+                )
+            })
+        }
+
+        #[napi]
+        pub fn get_active_action_set_layers(&self) -> Result<Vec<BigInt>, Error> {
+            with_input(|input| {
+                let mut layers = [0; sys::STEAM_INPUT_MAX_ACTIVE_LAYERS as usize];
+                let count = unsafe {
+                    sys::SteamAPI_ISteamInput_GetActiveActionSetLayers(
+                        input,
+                        self.handle.get_u64().1,
+                        layers.as_mut_ptr(),
+                    )
+                };
+                layers
+                    .into_iter()
+                    .take(count.max(0) as usize)
+                    .map(BigInt::from)
+                    .collect()
+            })
+        }
+
+        /// Motor speeds range from 0 (stop) to 65535.
+        #[napi]
+        pub fn trigger_vibration(&self, left_speed: u16, right_speed: u16) -> Result<(), Error> {
+            with_input(|input| unsafe {
+                sys::SteamAPI_ISteamInput_TriggerVibration(
+                    input,
+                    self.handle.get_u64().1,
+                    left_speed,
+                    right_speed,
+                )
+            })
+        }
+
+        /// Send a haptic pulse on Steam Deck or Steam Controller.
+        #[napi]
+        pub fn trigger_simple_haptic_event(
+            &self,
+            location: HapticLocation,
+            intensity: u8,
+            gain_db: i8,
+            other_intensity: u8,
+            other_gain_db: i8,
+        ) -> Result<(), Error> {
+            let location = match location {
+                HapticLocation::Left => {
+                    sys::EControllerHapticLocation::k_EControllerHapticLocation_Left
+                }
+                HapticLocation::Right => {
+                    sys::EControllerHapticLocation::k_EControllerHapticLocation_Right
+                }
+                HapticLocation::Both => {
+                    sys::EControllerHapticLocation::k_EControllerHapticLocation_Both
+                }
+            };
+            with_input(|input| unsafe {
+                sys::SteamAPI_ISteamInput_TriggerSimpleHapticEvent(
+                    input,
+                    self.handle.get_u64().1,
+                    location,
+                    intensity,
+                    gain_db as _,
+                    other_intensity,
+                    other_gain_db as _,
+                )
+            })
+        }
     }
 
     #[napi(object)]
@@ -111,10 +336,13 @@ pub mod input {
     #[napi]
     pub fn get_controllers() -> Vec<Controller> {
         let client = crate::client::get_client();
-        client
+        let mut handles = [0; sys::STEAM_INPUT_MAX_COUNT as usize];
+        let count = client
             .input()
-            .get_connected_controllers()
+            .get_connected_controllers_slice(&mut handles[..]);
+        handles
             .into_iter()
+            .take(count)
             .map(|identity| Controller {
                 handle: BigInt::from(identity),
             })
@@ -137,6 +365,78 @@ pub mod input {
     pub fn get_analog_action(action_name: String) -> BigInt {
         let client = crate::client::get_client();
         BigInt::from(client.input().get_analog_action_handle(&action_name))
+    }
+
+    #[napi]
+    pub fn get_glyph_for_action_origin(origin: f64) -> Result<String, Error> {
+        let origin = action_origin(origin)?;
+        with_input(|input| unsafe {
+            copy_text(sys::SteamAPI_ISteamInput_GetGlyphForActionOrigin_Legacy(
+                input, origin,
+            ))
+        })
+    }
+
+    #[napi]
+    pub fn get_glyph_png_for_action_origin(
+        origin: f64,
+        size: GlyphSize,
+        flags: Option<u32>,
+    ) -> Result<String, Error> {
+        let origin = action_origin(origin)?;
+        let size = match size {
+            GlyphSize::Small => sys::ESteamInputGlyphSize::k_ESteamInputGlyphSize_Small,
+            GlyphSize::Medium => sys::ESteamInputGlyphSize::k_ESteamInputGlyphSize_Medium,
+            GlyphSize::Large => sys::ESteamInputGlyphSize::k_ESteamInputGlyphSize_Large,
+        };
+        with_input(|input| unsafe {
+            copy_text(sys::SteamAPI_ISteamInput_GetGlyphPNGForActionOrigin(
+                input,
+                origin,
+                size,
+                flags.unwrap_or(0),
+            ))
+        })
+    }
+
+    #[napi]
+    pub fn get_glyph_svg_for_action_origin(
+        origin: f64,
+        flags: Option<u32>,
+    ) -> Result<String, Error> {
+        let origin = action_origin(origin)?;
+        with_input(|input| unsafe {
+            copy_text(sys::SteamAPI_ISteamInput_GetGlyphSVGForActionOrigin(
+                input,
+                origin,
+                flags.unwrap_or(0),
+            ))
+        })
+    }
+
+    #[napi]
+    pub fn get_string_for_action_origin(origin: f64) -> Result<String, Error> {
+        let origin = action_origin(origin)?;
+        with_input(|input| unsafe {
+            copy_text(sys::SteamAPI_ISteamInput_GetStringForActionOrigin(
+                input, origin,
+            ))
+        })
+    }
+
+    #[napi]
+    pub fn set_input_action_manifest_file_path(path: String) -> Result<bool, Error> {
+        if path.contains('\0') {
+            return Err(Error::from_reason("Manifest path contains a NUL byte"));
+        }
+        Ok(crate::client::get_client()
+            .input()
+            .set_input_action_manifest_file_path(&path))
+    }
+
+    #[napi]
+    pub fn run_frame() {
+        crate::client::get_client().input().run_frame();
     }
 
     #[napi]

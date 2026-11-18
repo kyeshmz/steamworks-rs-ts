@@ -8,6 +8,16 @@ pub mod utils {
     use tokio::sync::oneshot;
 
     #[napi]
+    pub fn is_overlay_enabled() -> bool {
+        crate::client::get_client().utils().is_overlay_enabled()
+    }
+
+    #[napi]
+    pub fn ui_language() -> String {
+        crate::client::get_client().utils().ui_language()
+    }
+
+    #[napi]
     pub fn get_app_id() -> u32 {
         let client = crate::client::get_client();
         client.utils().app_id().0

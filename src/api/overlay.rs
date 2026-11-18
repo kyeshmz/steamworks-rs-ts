@@ -7,6 +7,27 @@ pub mod overlay {
     use steamworks::OverlayToStoreFlag;
 
     #[napi]
+    pub enum NotificationPosition {
+        TopLeft,
+        TopRight,
+        BottomLeft,
+        BottomRight,
+    }
+
+    #[napi]
+    pub fn set_notification_position(position: NotificationPosition) {
+        let position = match position {
+            NotificationPosition::TopLeft => steamworks::NotificationPosition::TopLeft,
+            NotificationPosition::TopRight => steamworks::NotificationPosition::TopRight,
+            NotificationPosition::BottomLeft => steamworks::NotificationPosition::BottomLeft,
+            NotificationPosition::BottomRight => steamworks::NotificationPosition::BottomRight,
+        };
+        crate::client::get_client()
+            .utils()
+            .set_overlay_notification_position(position);
+    }
+
+    #[napi]
     pub enum Dialog {
         Friends,
         Community,
