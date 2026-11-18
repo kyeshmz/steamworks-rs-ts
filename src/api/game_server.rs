@@ -3,29 +3,6 @@ use napi_derive::napi;
 use std::sync::{Arc, Mutex};
 use steamworks::{CallbackHandle, Client, Server, ServerManager};
 
-struct TicketValidation {
-    peer: u64,
-    owner: u64,
-    response: u32,
-}
-
-// The pinned safe callback panics for SDK response 10, so this reads the raw event.
-unsafe impl steamworks::Callback for TicketValidation {
-    const ID: i32 = steamworks::sys::ValidateAuthTicketResponse_t_k_iCallback as i32;
-    const SIZE: i32 = std::mem::size_of::<steamworks::sys::ValidateAuthTicketResponse_t>() as i32;
-    unsafe fn from_raw(raw: *mut std::ffi::c_void) -> Self {
-        let event = raw.cast::<steamworks::sys::ValidateAuthTicketResponse_t>();
-        Self {
-            peer: std::ptr::addr_of!((*event).m_SteamID.m_steamid.m_unAll64Bits).read_unaligned(),
-            owner: std::ptr::addr_of!((*event).m_OwnerSteamID.m_steamid.m_unAll64Bits)
-                .read_unaligned(),
-            response: std::ptr::addr_of!((*event).m_eAuthSessionResponse)
-                .cast::<u32>()
-                .read_unaligned(),
-        }
-    }
-}
-
 struct Dedicated {
     sdk: Server,
     pump: Client<ServerManager>,
@@ -38,10 +15,11 @@ static SERVER: Mutex<Option<Dedicated>> = Mutex::new(None);
 #[napi]
 pub mod game_server {
     use super::*;
+    use crate::api::steam_events::TicketValidation;
     use napi::{
-        bindgen_prelude::{BigInt, Buffer},
-        threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode},
-        JsFunction, Status,
+        bindgen_prelude::{BigInt, Buffer, Function},
+        threadsafe_function::ThreadsafeFunctionCallMode,
+        Status,
     };
     use std::net::Ipv4Addr;
     use steamworks::{
@@ -57,6 +35,7 @@ pub mod game_server {
     }
 
     #[napi(string_enum)]
+    #[derive(Clone, Copy)]
     pub enum ConnectionState {
         Ready,
         Connecting,
@@ -275,25 +254,9 @@ pub mod game_server {
         #[napi(
             ts_arg_type = "(event: { steam_id: bigint; owner_steam_id: bigint; response: number }) => void"
         )]
-        handler: JsFunction,
+        handler: Function<'_, TicketValidation, ()>,
     ) -> Result<AuthListener> {
-        let listener: ThreadsafeFunction<TicketValidation, ErrorStrategy::Fatal> = handler
-            .create_threadsafe_function(
-                0,
-                |ctx: napi::threadsafe_function::ThreadSafeCallContext<TicketValidation>| {
-                    let mut value = ctx.env.create_object()?;
-                    value.set_named_property(
-                        "steam_id",
-                        ctx.env.create_bigint_from_u64(ctx.value.peer)?,
-                    )?;
-                    value.set_named_property(
-                        "owner_steam_id",
-                        ctx.env.create_bigint_from_u64(ctx.value.owner)?,
-                    )?;
-                    value.set_named_property("response", ctx.value.response)?;
-                    Ok(vec![value])
-                },
-            )?;
+        let listener = handler.build_threadsafe_function().build()?;
         with_server(|s| {
             let handle = s.sdk.register_callback(move |event: TicketValidation| {
                 listener.call(event, ThreadsafeFunctionCallMode::Blocking);

@@ -2,9 +2,7 @@ use napi_derive::napi;
 
 #[napi]
 pub mod workshop {
-    use napi::bindgen_prelude::{BigInt, Error};
-    use napi::threadsafe_function::ErrorStrategy;
-    use napi::threadsafe_function::ThreadsafeFunction;
+    use napi::bindgen_prelude::{BigInt, Error, Function};
     use napi::threadsafe_function::ThreadsafeFunctionCallMode;
     use std::path::Path;
     use steamworks::{ClientManager, PublishedFileId, UpdateHandle};
@@ -380,23 +378,25 @@ pub mod workshop {
         update_details: UgcUpdate,
         app_id: Option<u32>,
 
-        #[napi(ts_arg_type = "(data: UgcResult) => void")] success_callback: napi::JsFunction,
+        #[napi(ts_arg_type = "(data: UgcResult) => void")] success_callback: Function<
+            '_,
+            UgcResult,
+            (),
+        >,
 
-        #[napi(ts_arg_type = "(err: any) => void")] error_callback: napi::JsFunction,
+        #[napi(ts_arg_type = "(err: any) => void")] error_callback: Function<'_, Error, ()>,
 
         #[napi(ts_arg_type = "(data: UpdateProgress) => void")] progress_callback: Option<
-            napi::JsFunction,
+            Function<'_, UpdateProgress, ()>,
         >,
 
         progress_callback_interval_ms: Option<u32>,
     ) {
-        let success_callback: ThreadsafeFunction<UgcResult, ErrorStrategy::Fatal> =
-            success_callback
-                .create_threadsafe_function(0, |ctx| Ok(vec![ctx.value]))
-                .unwrap();
-        let error_callback: ThreadsafeFunction<Error, ErrorStrategy::Fatal> = error_callback
-            .create_threadsafe_function(0, |ctx| Ok(vec![ctx.value]))
+        let success_callback = success_callback
+            .build_threadsafe_function()
+            .build()
             .unwrap();
+        let error_callback = error_callback.build_threadsafe_function().build().unwrap();
 
         let item_id = match update_details
             .validate()
@@ -434,10 +434,10 @@ pub mod workshop {
             });
 
             if let Some(progress_callback) = progress_callback {
-                let progress_callback: ThreadsafeFunction<UpdateProgress, ErrorStrategy::Fatal> =
-                    progress_callback
-                        .create_threadsafe_function(0, |ctx| Ok(vec![ctx.value]))
-                        .unwrap();
+                let progress_callback = progress_callback
+                    .build_threadsafe_function()
+                    .build()
+                    .unwrap();
 
                 std::thread::spawn(move || loop {
                     let (status, progress, total) = update_watch_handle.progress();

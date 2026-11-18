@@ -4,9 +4,9 @@ use napi_derive::napi;
 pub mod networking_messages {
     use crate::api::localplayer::PlayerSteamId;
     use napi::{
-        bindgen_prelude::{BigInt, Buffer},
-        threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode},
-        Env, Error, JsFunction, Result, Status,
+        bindgen_prelude::{BigInt, Buffer, Function},
+        threadsafe_function::ThreadsafeFunctionCallMode,
+        Error, Result, Status,
     };
     use steamworks::{
         networking_types::{NetworkingIdentity, SendFlags},
@@ -144,14 +144,13 @@ pub mod networking_messages {
     /// Notifies without accepting. Omit the handler to stop listening.
     #[napi(strict)]
     pub fn set_session_request_handler(
-        env: Env,
-        #[napi(ts_arg_type = "(request: SessionRequest) => void")] handler: Option<JsFunction>,
+        #[napi(ts_arg_type = "(request: SessionRequest) => void")] handler: Option<
+            Function<'_, SessionRequest, ()>,
+        >,
     ) -> Result<()> {
         let client = crate::client::get_client();
         if let Some(handler) = handler {
-            let mut callback: ThreadsafeFunction<SessionRequest, ErrorStrategy::Fatal> =
-                handler.create_threadsafe_function(0, |ctx| Ok(vec![ctx.value]))?;
-            callback.unref(&env)?;
+            let callback = handler.build_threadsafe_function().weak::<true>().build()?;
             client.register_callback(move |request: SessionRequest| {
                 callback.call(request, ThreadsafeFunctionCallMode::NonBlocking);
             });
@@ -209,14 +208,13 @@ pub mod networking_messages {
     /// Replaces the failure handler. Omit the handler to stop listening.
     #[napi]
     pub fn set_session_failed_handler(
-        env: Env,
-        #[napi(ts_arg_type = "(failure: SessionFailure) => void")] handler: Option<JsFunction>,
+        #[napi(ts_arg_type = "(failure: SessionFailure) => void")] handler: Option<
+            Function<'_, SessionFailure, ()>,
+        >,
     ) -> Result<()> {
         let messages = crate::client::get_client().networking_messages();
         if let Some(handler) = handler {
-            let mut callback: ThreadsafeFunction<SessionFailure, ErrorStrategy::Fatal> =
-                handler.create_threadsafe_function(0, |ctx| Ok(vec![ctx.value]))?;
-            callback.unref(&env)?;
+            let callback = handler.build_threadsafe_function().weak::<true>().build()?;
             messages.session_failed_callback(move |info| {
                 let steam_id = info.identity_remote().and_then(|id| id.steam_id());
                 callback.call(

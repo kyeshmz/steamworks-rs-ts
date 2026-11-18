@@ -92,7 +92,20 @@ pub mod cloud {
     #[napi]
     pub struct FileInfo {
         pub name: String,
-        pub size: BigInt,
+        size: BigInt,
+    }
+
+    #[napi]
+    impl FileInfo {
+        #[napi(getter)]
+        pub fn get_size(&self) -> BigInt {
+            self.size.clone()
+        }
+
+        #[napi(setter)]
+        pub fn set_size(&mut self, value: BigInt) {
+            self.size = value;
+        }
     }
 
     #[napi]
@@ -190,7 +203,11 @@ pub mod cloud {
     }
 
     #[napi(ts_return_type = "Promise<void>")]
-    pub fn write_file_bytes(env: Env, name: String, data: Buffer) -> Result<napi::JsObject, Error> {
+    pub fn write_file_bytes(
+        env: &Env,
+        name: String,
+        data: Buffer,
+    ) -> Result<napi::bindgen_prelude::PromiseRaw<'_, ()>, Error> {
         let bytes = data.to_vec();
         env.spawn_future(async move {
             check_name(&name)?;

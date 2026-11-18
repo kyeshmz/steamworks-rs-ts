@@ -5,15 +5,13 @@
     "main": "index.js",
     "types": "index.d.ts",
     "napi": {
-        "name": "steamworksjs",
-        "triples": {
-            "additional": [
-                "x86_64-pc-windows-msvc",
-                "x86_64-unknown-linux-gnu",
-                "x86_64-apple-darwin",
-                "aarch64-apple-darwin"
-            ]
-        }
+        "binaryName": "steamworksjs",
+        "targets": [
+            "x86_64-pc-windows-msvc",
+            "x86_64-unknown-linux-gnu",
+            "x86_64-apple-darwin",
+            "aarch64-apple-darwin"
+        ]
     },
     "files": [
         "dist/*",
@@ -24,13 +22,13 @@
     ],
     "license": "MIT",
     "devDependencies": {
-        "@napi-rs/cli": "2.18.4",
-        "electron": "24.2.0",
-        "rimraf": "6.0.1",
-        "typescript": "5.5.3"
+        "@napi-rs/cli": "3.10.12",
+        "electron": "45.3.2",
+        "rimraf": "6.1.4",
+        "typescript": "7.0.2"
     },
     "dependencies": {
-        "@types/node": "20.14.0"
+        "@types/node": "22.20.5"
     },
     "engines": {
         "node": ">= 14"

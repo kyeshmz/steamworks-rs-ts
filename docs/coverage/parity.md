@@ -38,7 +38,7 @@ The local comparison uses generated `client.d.ts`, `index.d.ts` and direct root 
 
 ## Reproduce offline
 
-Use the repository's locked dependencies (TypeScript 5.5.3), Node and Git. First obtain the Git objects following [the census instructions](README.md#reproduce-or-refresh). For the independent repository, fetch the exact commit into the local object store if necessary:
+Use the repository's locked TypeScript dependency, Node and Git. First obtain the Git objects following [the census instructions](README.md#reproduce-or-refresh). For the independent repository, fetch the exact commit into the local object store if necessary:
 
 ```sh
 jq -r '(["ArtyProf/steamworks-ffi-node", .upstream], (.forks[] | [.[0], .[2]])) | @tsv' docs/coverage/parity-ffi-forks.json |

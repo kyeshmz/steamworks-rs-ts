@@ -2,14 +2,27 @@
 const fs = require('node:fs')
 const { execFileSync } = require('node:child_process')
 const { createHash } = require('node:crypto')
-const ts = require('typescript')
+const ts = require('typescript/unstable/ast')
+const { API } = require('typescript/unstable/sync')
+const { createVirtualFileSystem } = require('typescript/unstable/fs')
 const dir = 'docs/coverage/'
 const lock = JSON.parse(fs.readFileSync(dir + 'snapshot.json'))
 const ffiLock = JSON.parse(fs.readFileSync(dir + 'parity-ffi-forks.json'))
 const ffi = ffiLock.upstream
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trimEnd()
 const blob = (sha, path) => git('show', `${sha}:${path}`)
-const ast = (path, text) => ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true)
+const sources = createVirtualFileSystem({})
+const compiler = new API({ fs: sources })
+function ast(path, text) {
+    const hash = createHash('sha256').update(text).digest('hex')
+    const file = `${process.cwd().replaceAll('\\', '/')}/.audit/${hash}/${path}`
+    sources.writeFile(file, text)
+    const snapshot = compiler.updateSnapshot({ openFiles: [file] })
+    const source = snapshot.getDefaultProjectForFile(file).program.getSourceFile(file)
+    snapshot.dispose()
+    compiler.updateSnapshot({ closeFiles: [file] }).dispose()
+    return source
+}
 const isPublic = n => !(n.modifiers || []).some(m => [ts.SyntaxKind.PrivateKeyword, ts.SyntaxKind.ProtectedKeyword].includes(m.kind))
 function symbols(file, scope = '', classScope) {
     const names = new Set()
@@ -17,13 +30,17 @@ function symbols(file, scope = '', classScope) {
         if (!isPublic(n)) return
         if (ts.isModuleDeclaration(n) || ts.isClassDeclaration(n)) {
             const group = ts.isClassDeclaration(n) && classScope !== undefined ? classScope : prefix + n.name.text + '.'
-            ts.forEachChild(n, child => walk(child, group))
+            n.forEachChild(child => walk(child, group))
+        } else if (ts.isVariableStatement(n) && n.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) {
+            for (const decl of n.declarationList.declarations) {
+                if (decl.type && ts.isFunctionTypeNode(decl.type)) names.add(prefix + decl.name.text)
+            }
         } else if (ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n) || ts.isGetAccessorDeclaration(n)) {
             names.add(prefix + n.name.text)
         } else if (ts.isEnumDeclaration(n) && prefix === 'callback.' && n.name.text === 'SteamCallback') {
             for (const member of n.members) names.add('callback.SteamCallback.' + member.name.text)
         } else if (ts.isSourceFile(n) || ts.isModuleBlock(n)) {
-            ts.forEachChild(n, child => walk(child, prefix))
+            n.forEachChild(child => walk(child, prefix))
         }
     }
     walk(file, scope)
@@ -118,6 +135,7 @@ const local = new Set(inputs.filter(path => path.endsWith('.d.ts')).flatMap(path
         return path === 'client.d.ts' && members.length && rootGroups.has(group) ? [rootGroups.get(group), ...members].join('.') : name
     })
 }))
+compiler.close()
 const rules = JSON.parse(fs.readFileSync(dir + 'parity-rules.json', 'utf8'))
 const seenRules = new Set()
 function assess(name, pin) {

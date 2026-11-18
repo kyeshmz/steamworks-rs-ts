@@ -36,3 +36,29 @@ unsafe impl Callback for InventoryDefinitionUpdate {
         Self
     }
 }
+
+#[napi_derive::napi(object, object_from_js = false)]
+pub struct TicketValidation {
+    #[napi(js_name = "steam_id")]
+    pub peer: u64,
+    #[napi(js_name = "owner_steam_id")]
+    pub owner: u64,
+    pub response: u32,
+}
+
+// The pinned safe callback panics for SDK response 10 (network identity failure).
+unsafe impl steamworks::Callback for TicketValidation {
+    const ID: i32 = sys::ValidateAuthTicketResponse_t_k_iCallback as i32;
+    const SIZE: i32 = std::mem::size_of::<sys::ValidateAuthTicketResponse_t>() as i32;
+    unsafe fn from_raw(raw: *mut std::ffi::c_void) -> Self {
+        let event = raw.cast::<sys::ValidateAuthTicketResponse_t>();
+        Self {
+            peer: std::ptr::addr_of!((*event).m_SteamID.m_steamid.m_unAll64Bits).read_unaligned(),
+            owner: std::ptr::addr_of!((*event).m_OwnerSteamID.m_steamid.m_unAll64Bits)
+                .read_unaligned(),
+            response: std::ptr::addr_of!((*event).m_eAuthSessionResponse)
+                .cast::<u32>()
+                .read_unaligned(),
+        }
+    }
+}

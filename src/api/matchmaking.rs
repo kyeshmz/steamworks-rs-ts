@@ -189,12 +189,22 @@ pub mod matchmaking {
 
     #[napi]
     pub struct Lobby {
-        pub id: BigInt,
+        id: BigInt,
         lobby_id: LobbyId,
     }
 
     #[napi]
     impl Lobby {
+        #[napi(getter)]
+        pub fn get_id(&self) -> BigInt {
+            self.id.clone()
+        }
+
+        #[napi(setter)]
+        pub fn set_id(&mut self, value: BigInt) {
+            self.id = value;
+        }
+
         #[napi]
         pub async fn join(&self) -> Result<Lobby, Error> {
             join_lobby(self.id.clone()).await

@@ -39,18 +39,22 @@ target.files.forEach(file => {
     fs.copyFileSync(source, dest)
 })
 
-const relative = path.relative(process.cwd(), dist)
+function packageBin(pkg, executable) {
+    const manifest = require.resolve(`${pkg}/package.json`)
+    return path.resolve(path.dirname(manifest), require(manifest).bin[executable])
+}
 const params = [
     'build',
     '--platform',
-    '--no-dts-header',
-    '--js', 'false',
+    '--dts-header', '/// <reference types="node" />',
+    '--no-js',
+    '--const-enum',
     '--dts', '../../client.d.ts',
-    relative,
+    '--output-dir', dist,
     ...process.argv.slice(2)
 ]
 
-child_process.execFileSync(process.execPath, [require.resolve('@napi-rs/cli/scripts/index.js'), ...params], { stdio: 'inherit' })
+child_process.execFileSync(process.execPath, [packageBin('@napi-rs/cli', 'napi'), ...params], { stdio: 'inherit' })
 child_process.execFileSync(process.execPath, [
-    require.resolve('typescript/bin/tsc'), 'index.js', '--allowJs', '--declaration', '--emitDeclarationOnly'
+    packageBin('typescript', 'tsc'), 'index.js', '--allowJs', '--declaration', '--emitDeclarationOnly'
 ], { stdio: 'inherit' })

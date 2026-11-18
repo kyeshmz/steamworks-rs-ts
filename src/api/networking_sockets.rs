@@ -3,9 +3,9 @@ use napi_derive::napi;
 #[napi]
 pub mod networking_sockets {
     use napi::{
-        bindgen_prelude::{BigInt, Buffer},
-        threadsafe_function::{ErrorStrategy, ThreadsafeFunction, ThreadsafeFunctionCallMode},
-        Env, Error, JsFunction, Result,
+        bindgen_prelude::{BigInt, Buffer, Function},
+        threadsafe_function::ThreadsafeFunctionCallMode,
+        Error, Result,
     };
     use std::{mem::MaybeUninit, net::IpAddr, ptr, slice};
     use steamworks::{networking_types::NetworkingIdentity, sys, Callback};
@@ -202,14 +202,13 @@ pub mod networking_sockets {
 
     #[napi(strict)]
     pub fn set_connection_status_handler(
-        env: Env,
-        #[napi(ts_arg_type = "(info: ConnectionInfo) => void")] handler: Option<JsFunction>,
+        #[napi(ts_arg_type = "(info: ConnectionInfo) => void")] handler: Option<
+            Function<'_, ConnectionInfo, ()>,
+        >,
     ) -> Result<()> {
         let client = crate::client::get_client();
         if let Some(handler) = handler {
-            let mut callback: ThreadsafeFunction<ConnectionInfo, ErrorStrategy::Fatal> =
-                handler.create_threadsafe_function(0, |ctx| Ok(vec![ctx.value]))?;
-            callback.unref(&env)?;
+            let callback = handler.build_threadsafe_function().weak::<true>().build()?;
             client.register_callback(move |event: ConnectionInfo| {
                 callback.call(event, ThreadsafeFunctionCallMode::NonBlocking);
             });

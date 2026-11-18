@@ -305,10 +305,10 @@ pub mod auth {
     /// @param timeoutSeconds - The number of seconds to wait for Steam to complete the request. Default value is 10 seconds.
     #[napi(ts_return_type = "Promise<Buffer>")]
     pub fn request_encrypted_app_ticket(
-        env: Env,
+        env: &Env,
         data_to_include: Option<Buffer>,
         timeout_seconds: Option<f64>,
-    ) -> Result<napi::JsObject, Error> {
+    ) -> Result<napi::bindgen_prelude::PromiseRaw<'_, Buffer>, Error> {
         let bytes = data_to_include.as_deref().unwrap_or_default();
         let data = (bytes.len() <= MAX_APP_DATA).then(|| bytes.to_vec());
         let seconds = timeout_seconds.unwrap_or(10.0);
