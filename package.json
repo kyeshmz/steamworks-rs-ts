@@ -24,7 +24,7 @@
     ],
     "license": "MIT",
     "devDependencies": {
-        "@napi-rs/cli": "2.18.4",
+        "@napi-rs/cli": "3.10.12",
         "electron": "24.2.0",
         "rimraf": "6.0.1",
         "typescript": "5.5.3"
