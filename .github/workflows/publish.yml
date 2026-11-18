@@ -69,14 +69,14 @@ jobs:
                   pnpm run build --target x86_64-unknown-linux-gnu
                   test -s client.d.ts && test -s index.d.ts
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v7
               with:
                   name: declarations
                   path: '*.d.ts'
                   if-no-files-found: error
 
             - name: Upload artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: binaries-linux
                   path: dist
@@ -94,7 +94,7 @@ jobs:
             - uses: Swatinem/rust-cache@v2
             - run: pnpm install --frozen-lockfile
             - run: pnpm run build --target x86_64-pc-windows-msvc
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v7
               with:
                   name: binaries-windows
                   path: dist
@@ -130,7 +130,7 @@ jobs:
               run: pnpm run build --target aarch64-apple-darwin
 
             - name: Upload artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: binaries-macos
                   path: dist
@@ -174,7 +174,7 @@ jobs:
                   pnpm add "$RUNNER_TEMP"/*.tgz
                   cp "$GITHUB_WORKSPACE/test/typescript/index.ts" .
                   "$GITHUB_WORKSPACE/node_modules/.bin/tsc" --strict --noEmit index.ts
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v7
               with:
                   name: npm-package
                   path: ${{ runner.temp }}/*.tgz
