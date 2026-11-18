@@ -5,11 +5,41 @@ pub mod auth {
     use std::net::SocketAddr;
 
     use napi::bindgen_prelude::{BigInt, Buffer, Error};
+    use napi::Env;
+    use steamworks::sys;
     use steamworks::{
         networking_types::NetworkingIdentity, AuthSessionTicketResponse, AuthTicket, SteamId,
         TicketForWebApiResponse,
     };
-    use tokio::sync::oneshot;
+    use tokio::sync::{oneshot, Mutex};
+
+    const MAX_APP_DATA: usize = 128;
+    const TICKET_BUFFER: usize = 1024;
+
+    // Steam allows one pending EncryptedAppTicketResponse_t per user. Serializing keeps
+    // concurrent callers from reading each other's ticket out of the shared
+    // GetEncryptedAppTicket buffer.
+    lazy_static! {
+        static ref ENCRYPTED_TICKET_SLOT: Mutex<()> = Mutex::new(());
+    }
+
+    fn steam_user() -> Result<*mut sys::ISteamUser, Error> {
+        let user = unsafe { sys::SteamAPI_SteamUser_v023() };
+        if user.is_null() {
+            Err(Error::from_reason("Steam User unavailable"))
+        } else {
+            Ok(user)
+        }
+    }
+
+    fn steam_utils() -> Result<*mut sys::ISteamUtils, Error> {
+        let utils = unsafe { sys::SteamAPI_SteamUtils_v010() };
+        if utils.is_null() {
+            Err(Error::from_reason("Steam Utils unavailable"))
+        } else {
+            Ok(utils)
+        }
+    }
 
     fn session_peer(id: BigInt) -> Result<SteamId, Error> {
         let (_, raw, lossless) = id.get_u64();
@@ -208,6 +238,141 @@ pub mod auth {
                     "Steam didn't validated the ticket in time.",
                 ))
             }
+        }
+    }
+
+    fn encrypted_ticket_response(
+        utils: *mut sys::ISteamUtils,
+        call: sys::SteamAPICall_t,
+    ) -> Result<sys::EncryptedAppTicketResponse_t, Error> {
+        let mut response: sys::EncryptedAppTicketResponse_t = unsafe { std::mem::zeroed() };
+        let mut failed = false;
+        let fetched = unsafe {
+            sys::SteamAPI_ISteamUtils_GetAPICallResult(
+                utils,
+                call,
+                (&mut response) as *mut _ as *mut _,
+                std::mem::size_of::<sys::EncryptedAppTicketResponse_t>() as i32,
+                sys::EncryptedAppTicketResponse_t_k_iCallback as i32,
+                &mut failed,
+            )
+        };
+        if !fetched || failed {
+            let reason = unsafe { sys::SteamAPI_ISteamUtils_GetAPICallFailureReason(utils, call) };
+            return Err(Error::from_reason(format!(
+                "Steam failed the encrypted app ticket request: {reason:?}"
+            )));
+        }
+        Ok(response)
+    }
+
+    fn encrypted_ticket_bytes(user: *mut sys::ISteamUser) -> Result<Buffer, Error> {
+        let mut buffer = vec![0u8; TICKET_BUFFER];
+        let mut ticket_len: u32 = 0;
+        let mut copied = unsafe {
+            sys::SteamAPI_ISteamUser_GetEncryptedAppTicket(
+                user,
+                buffer.as_mut_ptr() as *mut _,
+                buffer.len() as i32,
+                &mut ticket_len,
+            )
+        };
+        if !copied && (buffer.len() + 1..=64 * 1024).contains(&(ticket_len as usize)) {
+            buffer.resize(ticket_len as usize, 0);
+            copied = unsafe {
+                sys::SteamAPI_ISteamUser_GetEncryptedAppTicket(
+                    user,
+                    buffer.as_mut_ptr() as *mut _,
+                    buffer.len() as i32,
+                    &mut ticket_len,
+                )
+            };
+        }
+        if !copied || ticket_len == 0 || ticket_len as usize > buffer.len() {
+            return Err(Error::from_reason(
+                "Steam completed the request without an encrypted app ticket",
+            ));
+        }
+        buffer.truncate(ticket_len as usize);
+        Ok(buffer.into())
+    }
+
+    /// Request an encrypted app ticket and resolve with its bytes. Unlike a session
+    /// ticket this is issued for your backend to decrypt with the app's encrypted
+    /// ticket key, never for beginAuthSession.
+    ///
+    /// @param dataToInclude - Optional application data encrypted into the ticket, at most 128 bytes.
+    /// @param timeoutSeconds - The number of seconds to wait for Steam to complete the request. Default value is 10 seconds.
+    #[napi(ts_return_type = "Promise<Buffer>")]
+    pub fn request_encrypted_app_ticket(
+        env: Env,
+        data_to_include: Option<Buffer>,
+        timeout_seconds: Option<f64>,
+    ) -> Result<napi::JsObject, Error> {
+        let bytes = data_to_include.as_deref().unwrap_or_default();
+        let data = (bytes.len() <= MAX_APP_DATA).then(|| bytes.to_vec());
+        let seconds = timeout_seconds.unwrap_or(10.0);
+        env.spawn_future(async move {
+            let data = data.ok_or_else(|| {
+                Error::from_reason("Expected at most 128 bytes of application data")
+            })?;
+            if seconds.fract() != 0.0 || !(1.0..=u32::MAX as f64).contains(&seconds) {
+                return Err(Error::from_reason(
+                    "Expected a positive integer timeout in seconds",
+                ));
+            }
+            tokio::time::timeout(
+                std::time::Duration::from_secs(seconds as u64),
+                request_ticket(data),
+            )
+            .await
+            .map_err(|_| Error::from_reason("Steam encrypted app ticket request timed out"))?
+        })
+    }
+
+    async fn request_ticket(data: Vec<u8>) -> Result<Buffer, Error> {
+        let _slot = ENCRYPTED_TICKET_SLOT.lock().await;
+        let call = unsafe {
+            sys::SteamAPI_ISteamUser_RequestEncryptedAppTicket(
+                steam_user()?,
+                if data.is_empty() {
+                    std::ptr::null_mut()
+                } else {
+                    data.as_ptr() as *mut _
+                },
+                data.len() as i32,
+            )
+        };
+        if call == sys::k_uAPICallInvalid {
+            return Err(Error::from_reason(
+                "Steam did not accept the encrypted app ticket request",
+            ));
+        }
+
+        let mut poll = tokio::time::interval(std::time::Duration::from_millis(100));
+        loop {
+            poll.tick().await;
+
+            let utils = steam_utils()?;
+            let mut failed = false;
+            let completed =
+                unsafe { sys::SteamAPI_ISteamUtils_IsAPICallCompleted(utils, call, &mut failed) };
+            if failed {
+                return Err(Error::from_reason(
+                    "Steam failed the encrypted app ticket call",
+                ));
+            }
+            if !completed {
+                continue;
+            }
+
+            let response = encrypted_ticket_response(utils, call)?;
+            return match response.m_eResult {
+                sys::EResult::k_EResultOK => encrypted_ticket_bytes(steam_user()?),
+                result => Err(Error::from_reason(format!(
+                    "Steam rejected the encrypted app ticket request: {result:?}"
+                ))),
+            };
         }
     }
 }

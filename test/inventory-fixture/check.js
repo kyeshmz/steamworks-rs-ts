@@ -50,6 +50,15 @@ async function run() {
     assert.deepEqual(voice.getVoice(), Buffer.alloc(0))
     assert.deepEqual(voice.decompressVoice(Buffer.from([123]), 24000), Buffer.alloc(24000, 42))
     const peer = 76561197960265729n
+    await assert.rejects(auth.requestEncryptedAppTicket(Buffer.alloc(129)), /128 bytes/)
+    const tickets = await Promise.all([17, 29].map(n => {
+        const data = Buffer.from([n])
+        const result = auth.requestEncryptedAppTicket(data)
+        data.fill(0)
+        return result
+    }))
+    assert.deepEqual(tickets, [Buffer.alloc(1025, 17), Buffer.alloc(1025, 29)])
+    await assert.rejects(auth.requestEncryptedAppTicket(Buffer.from([0])), /Steam rejected/)
     for (const invalid of [0n, -1n, 1n << 64n, 1]) {
         assert.throws(() => auth.beginAuthSession(invalid, Buffer.from('bad')))
         assert.throws(() => auth.endAuthSession(invalid))

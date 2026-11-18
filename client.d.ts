@@ -69,6 +69,15 @@ export declare namespace auth {
    */
   export function getSessionTicketWithIp(ip: string, timeoutSeconds?: number | undefined | null): Promise<Ticket>
   export function getAuthTicketForWebApi(identity: string, timeoutSeconds?: number | undefined | null): Promise<Ticket>
+  /**
+   * Request an encrypted app ticket and resolve with its bytes. Unlike a session
+   * ticket this is issued for your backend to decrypt with the app's encrypted
+   * ticket key, never for beginAuthSession.
+   *
+   * @param dataToInclude - Optional application data encrypted into the ticket, at most 128 bytes.
+   * @param timeoutSeconds - The number of seconds to wait for Steam to complete the request. Default value is 10 seconds.
+   */
+  export function requestEncryptedAppTicket(dataToInclude?: Buffer | undefined | null, timeoutSeconds?: number | undefined | null): Promise<Buffer>
   export class Ticket {
     cancel(): void
     getBytes(): Buffer
@@ -233,11 +242,20 @@ export declare namespace game_server {
   export function init(options: ServerOptions): void
   export function updateListing(listing: ServerListing): void
   export function setAdvertising(active: boolean): void
+  /** Submit a remote peer's ticket. Wait for the validation event before granting access. */
+  export function beginAuthSession(steamId64: bigint, ticket: Buffer): void
+  /** End a session when its peer disconnects, validation fails, or you abandon it. */
+  export function endAuthSession(steamId64: bigint): void
+  /** The game server's ticket validation event. One listener; a later call replaces it. */
+  export function onValidateAuthTicketResponse(handler: (event: { steam_id: bigint; owner_steam_id: bigint; response: number }) => void): AuthListener
   export function logOn(token: string): void
   export function logOnAnonymous(): void
   export function status(): ServerStatus
   export function runCallbacks(): void
   export function shutdown(): boolean
+  export class AuthListener {
+    disconnect(): void
+  }
 }
 export declare namespace input {
   export const enum GlyphSize {

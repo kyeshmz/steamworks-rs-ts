@@ -31,6 +31,37 @@ static int accepted, rejected, ended, delivered, freed;
 static bool active;
 
 void *SteamAPI_SteamUser_v023(void) { return &init_calls; }
+static uint64_t ticket_call;
+static uint8_t ticket_marker;
+static bool ticket_pending;
+static int ticket_polls;
+uint64_t SteamAPI_ISteamUser_RequestEncryptedAppTicket(void *p, void *data, int n) {
+    assert(!ticket_pending && n == 1);
+    ticket_pending = true;
+    ticket_marker = *(uint8_t *)data;
+    ticket_polls = 0;
+    return ++ticket_call;
+}
+bool SteamAPI_ISteamUtils_IsAPICallCompleted(void *p, uint64_t call, bool *failed) {
+    assert(ticket_pending && call == ticket_call);
+    *failed = false;
+    return ticket_polls++ > 0;
+}
+bool SteamAPI_ISteamUtils_GetAPICallResult(void *p, uint64_t call, void *response, int size, int type, bool *failed) {
+    assert(ticket_pending && call == ticket_call && type == 154 && size == sizeof(int32_t));
+    *failed = false;
+    *(int32_t *)response = ticket_marker == 0 ? 2 : 1;
+    if (!ticket_marker) ticket_pending = false;
+    return true;
+}
+bool SteamAPI_ISteamUser_GetEncryptedAppTicket(void *p, void *dest, int capacity, uint32_t *size) {
+    assert(ticket_pending && ticket_marker);
+    *size = 1025;
+    if (capacity < 1025) return false;
+    memset(dest, ticket_marker, *size);
+    ticket_pending = false;
+    return true;
+}
 int SteamAPI_ISteamUser_BeginAuthSession(void *p, const void *ticket, int len, uint64_t id) {
     assert(p == &init_calls && id == peer && len == 3);
     if (!memcmp(ticket, "bad", 3)) { ++rejected; return 1; }

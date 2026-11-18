@@ -1,5 +1,9 @@
 import * as steamworks from "@kyeshmz/steamworks.ts";
 
+export function listenForServerValidation(check: (peer: bigint, status: number) => void) {
+	return steamworks.gameServer.onValidateAuthTicketResponse(event => check(event.steam_id, event.response));
+}
+
 export async function exchangeForReceipt(client: ReturnType<typeof steamworks.init>, itemId: bigint): Promise<Buffer> {
 	const result = await client.inventory.exchangeItemsSerialized(
 		[{ definition: 1002, quantity: 1 }], [{ itemId, quantity: 3 }]
