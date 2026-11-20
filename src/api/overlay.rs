@@ -83,6 +83,19 @@ pub mod overlay {
     }
 
     #[napi]
+    pub fn activate_invite_dialog_connect_string(connect: String) -> napi::Result<()> {
+        if connect.contains('\0') {
+            return Err(napi::Error::from_reason(
+                "Connect string contains a NUL byte",
+            ));
+        }
+        crate::client::get_client()
+            .friends()
+            .activate_invite_dialog_connect_string(&connect);
+        Ok(())
+    }
+
+    #[napi]
     pub fn activate_to_web_page(url: String) {
         let client = crate::client::get_client();
         client.friends().activate_game_overlay_to_web_page(&url)

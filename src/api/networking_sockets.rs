@@ -7,8 +7,10 @@ pub mod networking_sockets {
         threadsafe_function::ThreadsafeFunctionCallMode,
         Error, Result,
     };
-    use std::{mem::MaybeUninit, net::IpAddr, ptr, slice};
-    use steamworks::{networking_types::NetworkingIdentity, sys, Callback};
+    use std::{ffi::CString, mem::MaybeUninit, net::IpAddr, ptr, slice, sync::Mutex};
+    use steamworks::{networking_types::NetworkingIdentity, sys, Callback, CallbackHandle};
+
+    static STATUS_HANDLER: Mutex<Option<CallbackHandle>> = Mutex::new(None);
 
     fn sockets() -> Result<*mut sys::ISteamNetworkingSockets> {
         let api = unsafe { sys::SteamAPI_SteamNetworkingSockets_SteamAPI_v012() };
@@ -190,8 +192,7 @@ pub mod networking_sockets {
 
     unsafe impl Callback for ConnectionInfo {
         const ID: i32 = sys::SteamNetConnectionStatusChangedCallback_t_k_iCallback as i32;
-        const SIZE: i32 =
-            std::mem::size_of::<sys::SteamNetConnectionStatusChangedCallback_t>() as i32;
+
         unsafe fn from_raw(raw: *mut std::ffi::c_void) -> Self {
             let event = raw
                 .cast::<sys::SteamNetConnectionStatusChangedCallback_t>()
@@ -206,14 +207,19 @@ pub mod networking_sockets {
             Function<'_, ConnectionInfo, ()>,
         >,
     ) -> Result<()> {
-        let client = crate::client::get_client();
-        if let Some(handler) = handler {
-            let callback = handler.build_threadsafe_function().weak::<true>().build()?;
-            client.register_callback(move |event: ConnectionInfo| {
-                callback.call(event, ThreadsafeFunctionCallMode::NonBlocking);
-            });
-        } else {
-            client.register_callback(|_: ConnectionInfo| {});
+        let callback = handler
+            .map(|handler| handler.build_threadsafe_function().weak::<true>().build())
+            .transpose()?;
+        let mut slot = STATUS_HANDLER
+            .lock()
+            .map_err(|_| Error::from_reason("Connection handler lock poisoned"))?;
+        drop(slot.take());
+        if let Some(callback) = callback {
+            *slot = Some(crate::client::get_client().register_callback(
+                move |event: ConnectionInfo| {
+                    callback.call(event, ThreadsafeFunctionCallMode::NonBlocking);
+                },
+            ));
         }
         Ok(())
     }
@@ -230,6 +236,225 @@ pub mod networking_sockets {
             )
         };
         Ok(ok.then(|| info(conn, unsafe { out.assume_init() })))
+    }
+
+    #[napi(strict)]
+    pub fn connection_user_data(connection: f64) -> Result<Option<BigInt>> {
+        let connection = handle(connection)?;
+        let value = unsafe {
+            sys::SteamAPI_ISteamNetworkingSockets_GetConnectionUserData(sockets()?, connection)
+        };
+        Ok((value != -1).then(|| value.into()))
+    }
+
+    #[napi(strict)]
+    pub fn set_connection_user_data(connection: f64, value: BigInt) -> Result<bool> {
+        let connection = handle(connection)?;
+        let (value, exact) = value.get_i64();
+        if !exact {
+            return Err(Error::from_reason(
+                "userData must fit in a signed 64-bit integer",
+            ));
+        }
+        Ok(unsafe {
+            sys::SteamAPI_ISteamNetworkingSockets_SetConnectionUserData(
+                sockets()?,
+                connection,
+                value,
+            )
+        })
+    }
+
+    #[napi(strict)]
+    pub fn connection_name(connection: f64) -> Result<Option<String>> {
+        let connection = handle(connection)?;
+        let mut bytes = [0u8; 1024];
+        let ok = unsafe {
+            sys::SteamAPI_ISteamNetworkingSockets_GetConnectionName(
+                sockets()?,
+                connection,
+                bytes.as_mut_ptr().cast(),
+                bytes.len() as i32,
+            )
+        };
+        Ok(ok.then(|| {
+            let length = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+            String::from_utf8_lossy(&bytes[..length]).into_owned()
+        }))
+    }
+
+    #[napi(strict)]
+    pub fn set_connection_name(connection: f64, name: String) -> Result<()> {
+        let connection = handle(connection)?;
+        let name = CString::new(name).map_err(|_| Error::from_reason("Name contains NUL"))?;
+        unsafe {
+            sys::SteamAPI_ISteamNetworkingSockets_SetConnectionName(
+                sockets()?,
+                connection,
+                name.as_ptr(),
+            )
+        };
+        Ok(())
+    }
+
+    #[napi(strict)]
+    pub fn flush_messages(connection: f64) -> Result<()> {
+        let connection = handle(connection)?;
+        check(
+            unsafe {
+                sys::SteamAPI_ISteamNetworkingSockets_FlushMessagesOnConnection(
+                    sockets()?,
+                    connection,
+                )
+            },
+            "FlushMessagesOnConnection",
+        )
+    }
+
+    #[napi]
+    pub fn init_authentication() -> Result<i32> {
+        Ok(unsafe { sys::SteamAPI_ISteamNetworkingSockets_InitAuthentication(sockets()?) } as i32)
+    }
+
+    #[napi(object)]
+    pub struct AuthenticationStatus {
+        pub availability: i32,
+        pub debug_message: String,
+    }
+
+    #[napi]
+    pub fn authentication_status() -> Result<AuthenticationStatus> {
+        let mut details: sys::SteamNetAuthenticationStatus_t = unsafe { std::mem::zeroed() };
+        let status = unsafe {
+            sys::SteamAPI_ISteamNetworkingSockets_GetAuthenticationStatus(sockets()?, &mut details)
+        };
+        let bytes: Vec<u8> = details
+            .m_debugMsg
+            .iter()
+            .take_while(|&&b| b != 0)
+            .map(|&b| b as u8)
+            .collect();
+        Ok(AuthenticationStatus {
+            availability: status as i32,
+            debug_message: String::from_utf8_lossy(&bytes).into_owned(),
+        })
+    }
+
+    #[napi(object)]
+    pub struct LaneStatus {
+        pub pending_unreliable: i32,
+        pub pending_reliable: i32,
+        pub sent_unacked_reliable: i32,
+        pub queue_time_microseconds: BigInt,
+    }
+
+    #[napi(object)]
+    pub struct RealtimeStatus {
+        pub state: i32,
+        pub ping: i32,
+        pub quality_local: f64,
+        pub quality_remote: f64,
+        pub out_packets_per_second: f64,
+        pub out_bytes_per_second: f64,
+        pub in_packets_per_second: f64,
+        pub in_bytes_per_second: f64,
+        pub send_rate_bytes_per_second: i32,
+        pub pending_unreliable: i32,
+        pub pending_reliable: i32,
+        pub sent_unacked_reliable: i32,
+        pub queue_time_microseconds: BigInt,
+        pub lanes: Vec<LaneStatus>,
+    }
+
+    #[napi(strict)]
+    pub fn realtime_connection_status(
+        connection: f64,
+        lanes: Option<f64>,
+    ) -> Result<RealtimeStatus> {
+        let connection = handle(connection)?;
+        let count = integer(lanes.unwrap_or(0.0), 0, 32, "lanes")? as usize;
+        let mut status: sys::SteamNetConnectionRealTimeStatus_t = unsafe { std::mem::zeroed() };
+        let mut lane_status: Vec<sys::SteamNetConnectionRealTimeLaneStatus_t> =
+            (0..count).map(|_| unsafe { std::mem::zeroed() }).collect();
+        check(
+            unsafe {
+                sys::SteamAPI_ISteamNetworkingSockets_GetConnectionRealTimeStatus(
+                    sockets()?,
+                    connection,
+                    &mut status,
+                    count as i32,
+                    if count == 0 {
+                        ptr::null_mut()
+                    } else {
+                        lane_status.as_mut_ptr()
+                    },
+                )
+            },
+            "GetConnectionRealTimeStatus",
+        )?;
+        Ok(RealtimeStatus {
+            state: status.m_eState as i32,
+            ping: status.m_nPing,
+            quality_local: status.m_flConnectionQualityLocal as f64,
+            quality_remote: status.m_flConnectionQualityRemote as f64,
+            out_packets_per_second: status.m_flOutPacketsPerSec as f64,
+            out_bytes_per_second: status.m_flOutBytesPerSec as f64,
+            in_packets_per_second: status.m_flInPacketsPerSec as f64,
+            in_bytes_per_second: status.m_flInBytesPerSec as f64,
+            send_rate_bytes_per_second: status.m_nSendRateBytesPerSecond,
+            pending_unreliable: status.m_cbPendingUnreliable,
+            pending_reliable: status.m_cbPendingReliable,
+            sent_unacked_reliable: status.m_cbSentUnackedReliable,
+            queue_time_microseconds: status.m_usecQueueTime.into(),
+            lanes: lane_status
+                .into_iter()
+                .map(|lane| LaneStatus {
+                    pending_unreliable: lane.m_cbPendingUnreliable,
+                    pending_reliable: lane.m_cbPendingReliable,
+                    sent_unacked_reliable: lane.m_cbSentUnackedReliable,
+                    queue_time_microseconds: lane.m_usecQueueTime.into(),
+                })
+                .collect(),
+        })
+    }
+
+    #[napi(object)]
+    pub struct LaneConfig {
+        pub priority: f64,
+        pub weight: f64,
+    }
+
+    #[napi(strict)]
+    pub fn configure_connection_lanes(connection: f64, lanes: Vec<LaneConfig>) -> Result<()> {
+        let connection = handle(connection)?;
+        if lanes.is_empty() || lanes.len() > 32 {
+            return Err(Error::from_reason("Expected 1 to 32 lanes"));
+        }
+        let mut priorities = Vec::with_capacity(lanes.len());
+        let mut weights = Vec::with_capacity(lanes.len());
+        for lane in lanes {
+            if lane.priority.fract() != 0.0
+                || !(i32::MIN as f64..=i32::MAX as f64).contains(&lane.priority)
+            {
+                return Err(Error::from_reason(
+                    "priority must be a signed 32-bit integer",
+                ));
+            }
+            priorities.push(lane.priority as i32);
+            weights.push(integer(lane.weight, 1, u16::MAX as u32, "weight")? as u16);
+        }
+        check(
+            unsafe {
+                sys::SteamAPI_ISteamNetworkingSockets_ConfigureConnectionLanes(
+                    sockets()?,
+                    connection,
+                    priorities.len() as i32,
+                    priorities.as_ptr(),
+                    weights.as_ptr(),
+                )
+            },
+            "ConfigureConnectionLanes",
+        )
     }
 
     fn check(result: sys::EResult, operation: &str) -> Result<()> {
@@ -277,6 +502,116 @@ pub mod networking_sockets {
             "SendMessageToConnection",
         )?;
         Ok(number.into())
+    }
+
+    #[napi(object)]
+    pub struct OutgoingMessage {
+        pub connection: f64,
+        pub data: Buffer,
+        pub reliable: Option<bool>,
+        pub lane: Option<f64>,
+    }
+
+    #[napi(object)]
+    pub struct SendMessageResult {
+        pub message_number: Option<BigInt>,
+        pub error: Option<BigInt>,
+    }
+
+    #[napi(strict)]
+    pub fn send_messages(messages: Vec<OutgoingMessage>) -> Result<Vec<SendMessageResult>> {
+        if messages.len() > MAX_BATCH {
+            return Err(Error::from_reason(
+                "At most 32 messages may be sent at once",
+            ));
+        }
+        let validated: Vec<_> = messages
+            .iter()
+            .map(|message| {
+                let conn = handle(message.connection)?;
+                let lane = integer(message.lane.unwrap_or(0.0), 0, u16::MAX as u32, "lane")?;
+                if message.data.len() > 512 * 1024 {
+                    return Err(Error::from_reason("Message exceeds 512 KiB"));
+                }
+                Ok((conn, lane))
+            })
+            .collect::<Result<_>>()?;
+        if messages.is_empty() {
+            return Ok(Vec::new());
+        }
+        let api = sockets()?;
+        let utils = unsafe { sys::SteamAPI_SteamNetworkingUtils_SteamAPI_v004() };
+        if utils.is_null() {
+            return Err(Error::from_reason("Steam Networking Utils unavailable"));
+        }
+        struct OwnedMessages(Vec<*mut sys::SteamNetworkingMessage_t>);
+        impl Drop for OwnedMessages {
+            fn drop(&mut self) {
+                for &message in &self.0 {
+                    unsafe { sys::SteamAPI_SteamNetworkingMessage_t_Release(message) };
+                }
+            }
+        }
+        let mut allocated = OwnedMessages(Vec::with_capacity(messages.len()));
+        for (message, (conn, lane)) in messages.iter().zip(validated) {
+            let raw = unsafe {
+                sys::SteamAPI_ISteamNetworkingUtils_AllocateMessage(
+                    utils,
+                    message.data.len() as i32,
+                )
+            };
+            if raw.is_null() {
+                return Err(Error::from_reason("Steam failed to allocate a message"));
+            }
+            allocated.0.push(raw);
+            unsafe {
+                if !message.data.is_empty() {
+                    if (*raw).m_pData.is_null() {
+                        return Err(Error::from_reason(
+                            "Steam failed to allocate a message payload",
+                        ));
+                    }
+                    ptr::copy_nonoverlapping(
+                        message.data.as_ptr(),
+                        (*raw).m_pData.cast(),
+                        message.data.len(),
+                    );
+                }
+                (*raw).m_conn = conn;
+                (*raw).m_idxLane = lane as u16;
+                (*raw).m_nFlags = if message.reliable.unwrap_or(true) {
+                    sys::k_nSteamNetworkingSend_Reliable
+                } else {
+                    sys::k_nSteamNetworkingSend_Unreliable
+                };
+            }
+        }
+        let mut results = vec![0i64; messages.len()];
+        unsafe {
+            sys::SteamAPI_ISteamNetworkingSockets_SendMessages(
+                api,
+                allocated.0.len() as i32,
+                allocated.0.as_ptr(),
+                results.as_mut_ptr(),
+            );
+        }
+        allocated.0.clear();
+        Ok(results
+            .into_iter()
+            .map(|result| {
+                if result >= 0 {
+                    SendMessageResult {
+                        message_number: Some(result.into()),
+                        error: None,
+                    }
+                } else {
+                    SendMessageResult {
+                        message_number: None,
+                        error: Some(result.unsigned_abs().into()),
+                    }
+                }
+            })
+            .collect())
     }
 
     const MAX_BATCH: usize = 32;
@@ -422,6 +757,29 @@ pub mod networking_sockets {
         {
             Ok(status) => format!("{status:?}"),
             Err(status) => format!("{status:?}"),
+        }
+    }
+
+    #[napi(object)]
+    pub struct RelayNetworkStatus {
+        pub availability: String,
+        pub ping_measurement_in_progress: bool,
+        pub network_config: String,
+        pub any_relay: String,
+        pub debug_message: String,
+    }
+
+    #[napi]
+    pub fn detailed_relay_network_status() -> RelayNetworkStatus {
+        let status = crate::client::get_client()
+            .networking_utils()
+            .detailed_relay_network_status();
+        RelayNetworkStatus {
+            availability: format!("{:?}", status.availability()),
+            ping_measurement_in_progress: status.is_ping_measurement_in_progress(),
+            network_config: format!("{:?}", status.network_config()),
+            any_relay: format!("{:?}", status.any_relay()),
+            debug_message: status.debugging_message().to_owned(),
         }
     }
 }

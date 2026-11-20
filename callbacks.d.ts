@@ -23,6 +23,30 @@ export type ChatEntryType =
     | 'LinkBlocked'
 
 export interface CallbackReturns {
+    [client.callback.SteamCallback.RelayNetworkStatus]: {
+        availability: number
+        ping_measurement_in_progress: boolean
+        network_config: number
+        any_relay: number
+        debug_message: string
+    }
+    [client.callback.SteamCallback.GlobalStatsReceived]: { game_id: bigint; error: string | null }
+    [client.callback.SteamCallback.DeleteItemResult]: { published_file_id: bigint; error: string | null }
+    [client.callback.SteamCallback.LobbyCreated]: { result: number; lobby: bigint }
+    [client.callback.SteamCallback.LobbyEnter]: {
+        lobby: bigint
+        chat_permissions: number
+        blocked: boolean
+        chat_room_enter_response: 'Success' | 'DoesntExist' | 'NotAllowed' | 'Full' | 'Error' | 'Banned' | 'Limited' | 'ClanDisabled' | 'CommunityBan' | 'MemberBlockedYou' | 'YouBlockedMember' | 'RatelimitExceeded'
+    }
+    [client.callback.SteamCallback.NewUrlLaunchParameters]: {}
+    [client.callback.SteamCallback.UserStatsReceived]: { steam_id: bigint; game_id: bigint; error: string | null }
+    [client.callback.SteamCallback.UserStatsStored]: { game_id: bigint; error: string | null }
+    [client.callback.SteamCallback.UserAchievementStored]: { game_id: bigint; achievement_name: string; current_progress: number; max_progress: number }
+    [client.callback.SteamCallback.UserAchievementIconFetched]: { game_id: bigint; achievement_name: string; achieved: boolean; icon_handle: number }
+    [client.callback.SteamCallback.DownloadItemResult]: { app_id: number; published_file_id: bigint; error: string | null }
+    [client.callback.SteamCallback.RemotePlayConnected]: { session: number }
+    [client.callback.SteamCallback.RemotePlayDisconnected]: { session: number }
     [client.callback.SteamCallback.SteamInputDeviceConnected]: { device_handle: number | bigint }
     [client.callback.SteamCallback.SteamInputDeviceDisconnected]: { device_handle: number | bigint }
     [client.callback.SteamCallback.SteamInventoryDefinitionUpdate]: null
@@ -91,5 +115,22 @@ export interface CallbackReturns {
         active: boolean
         userInitiated: boolean
         appId: number
+    }
+}
+
+export type RuntimeCallbackReturns = Omit<CallbackReturns,
+    | client.callback.SteamCallback.SteamServersConnected
+    | client.callback.SteamCallback.SteamServersDisconnected
+    | client.callback.SteamCallback.SteamServerConnectFailure
+    | client.callback.SteamCallback.LobbyChatUpdate
+> & {
+    [client.callback.SteamCallback.SteamServersConnected]: null
+    [client.callback.SteamCallback.SteamServersDisconnected]: { reason: string }
+    [client.callback.SteamCallback.SteamServerConnectFailure]: { reason: string; still_retrying: boolean }
+    [client.callback.SteamCallback.LobbyChatUpdate]: {
+        lobby: bigint
+        user_changed: bigint
+        making_change: bigint
+        member_state_change: 'Entered' | 'Left' | 'Disconnected' | 'Kicked' | 'Banned'
     }
 }

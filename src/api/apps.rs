@@ -10,7 +10,7 @@ pub mod apps {
 
     fn with_apps<T>(call: impl FnOnce(*mut sys::ISteamApps) -> T) -> Result<T, Error> {
         let _client = crate::client::get_client();
-        let apps = unsafe { sys::SteamAPI_SteamApps_v008() };
+        let apps = unsafe { sys::SteamAPI_SteamApps_v009() };
         if apps.is_null() {
             return Err(Error::from_reason("Steam apps interface unavailable"));
         }

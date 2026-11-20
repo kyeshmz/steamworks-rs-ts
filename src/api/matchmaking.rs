@@ -6,6 +6,7 @@ pub mod matchmaking {
     use napi::bindgen_prelude::{BigInt, Buffer, Error};
     use std::collections::HashMap;
     use std::ffi::{CStr, CString};
+    use std::net::{Ipv4Addr, SocketAddrV4};
     use steamworks::{sys, LobbyId};
     use tokio::sync::oneshot;
 
@@ -78,6 +79,13 @@ pub mod matchmaking {
         pub slots_available: Option<u8>,
         pub distance: Option<LobbyDistance>,
         pub count: Option<i32>,
+    }
+
+    #[napi(object)]
+    pub struct LobbyGameServer {
+        pub ip: String,
+        pub port: u32,
+        pub steam_id: Option<BigInt>,
     }
 
     fn lobby_key(key: String) -> Result<CString, Error> {
@@ -197,8 +205,10 @@ pub mod matchmaking {
         }
 
         #[napi(setter)]
-        pub fn set_id(&mut self, value: BigInt) {
+        pub fn set_id(&mut self, value: BigInt) -> Result<(), Error> {
+            self.lobby_id = LobbyId::from_raw(member_id(value.clone())?);
             self.id = value;
+            Ok(())
         }
 
         #[napi]
@@ -332,6 +342,43 @@ pub mod matchmaking {
         }
 
         #[napi]
+        pub fn set_game_server(
+            &self,
+            ip: String,
+            port: f64,
+            steam_id: Option<BigInt>,
+        ) -> Result<(), Error> {
+            let ip = ip
+                .parse::<Ipv4Addr>()
+                .map_err(|_| Error::from_reason("Expected an IPv4 address"))?;
+            if port.fract() != 0.0 || !(0.0..=u16::MAX as f64).contains(&port) {
+                return Err(Error::from_reason(
+                    "Port must be an integer from 0 to 65535",
+                ));
+            }
+            let steam_id = steam_id
+                .map(member_id)
+                .transpose()?
+                .map(steamworks::SteamId::from_raw);
+            crate::client::get_client()
+                .matchmaking()
+                .set_lobby_game_server(self.lobby_id, SocketAddrV4::new(ip, port as u16), steam_id);
+            Ok(())
+        }
+
+        #[napi]
+        pub fn get_game_server(&self) -> Option<LobbyGameServer> {
+            crate::client::get_client()
+                .matchmaking()
+                .get_lobby_game_server(self.lobby_id)
+                .map(|(address, id)| LobbyGameServer {
+                    ip: address.ip().to_string(),
+                    port: address.port() as u32,
+                    steam_id: id.map(|id| BigInt::from(id.raw())),
+                })
+        }
+
+        #[napi]
         pub fn set_member_data(&self, key: String, value: String) -> Result<(), Error> {
             let key = lobby_key(key)?;
             let value = c_string(value)?;
@@ -429,32 +476,36 @@ pub mod matchmaking {
         pub fn merge_full_data(&self, data: HashMap<String, String>) -> bool {
             let matchmaking = crate::client::get_client().matchmaking();
             data.iter()
-                .map(|(key, value)| matchmaking.set_lobby_data(self.lobby_id, key, value))
-                .all(|x| x)
+                .all(|(key, value)| matchmaking.set_lobby_data(self.lobby_id, key, value))
         }
     }
 
     #[napi]
     pub async fn create_lobby(lobby_type: LobbyType, max_members: u32) -> Result<Lobby, Error> {
+        if max_members > 250 {
+            return Err(Error::from_reason("Lobby limit must be at most 250"));
+        }
         let client = crate::client::get_client();
 
         let (tx, rx) = oneshot::channel();
 
-        client.matchmaking().create_lobby(
-            match lobby_type {
-                LobbyType::Private => steamworks::LobbyType::Private,
-                LobbyType::FriendsOnly => steamworks::LobbyType::FriendsOnly,
-                LobbyType::Public => steamworks::LobbyType::Public,
-                LobbyType::Invisible => steamworks::LobbyType::Invisible,
-            },
-            max_members,
-            |result| {
-                tx.send(result).unwrap();
-            },
-        );
+        crate::api::runtime::without_dispatch(|| {
+            client.matchmaking().create_lobby(
+                match lobby_type {
+                    LobbyType::Private => steamworks::LobbyType::Private,
+                    LobbyType::FriendsOnly => steamworks::LobbyType::FriendsOnly,
+                    LobbyType::Public => steamworks::LobbyType::Public,
+                    LobbyType::Invisible => steamworks::LobbyType::Invisible,
+                },
+                max_members,
+                move |result| {
+                    let _ = tx.send(result);
+                },
+            );
+        });
 
         rx.await
-            .unwrap()
+            .map_err(|_| Error::from_reason("Create lobby callback dropped"))?
             .map(|lobby_id| Lobby {
                 id: BigInt::from(lobby_id.raw()),
                 lobby_id,
@@ -464,19 +515,19 @@ pub mod matchmaking {
 
     #[napi]
     pub async fn join_lobby(lobby_id: BigInt) -> Result<Lobby, Error> {
+        let lobby_id = LobbyId::from_raw(member_id(lobby_id)?);
         let client = crate::client::get_client();
 
         let (tx, rx) = oneshot::channel();
 
-        client.matchmaking().join_lobby(
-            steamworks::LobbyId::from_raw(lobby_id.get_u64().1),
-            |result| {
-                tx.send(result).unwrap();
-            },
-        );
+        crate::api::runtime::without_dispatch(|| {
+            client.matchmaking().join_lobby(lobby_id, move |result| {
+                let _ = tx.send(result);
+            });
+        });
 
         rx.await
-            .unwrap()
+            .map_err(|_| Error::from_reason("Join lobby callback dropped"))?
             .map(|lobby_id| Lobby {
                 id: BigInt::from(lobby_id.raw()),
                 lobby_id,
@@ -489,15 +540,16 @@ pub mod matchmaking {
         static SEARCH: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
         let _search = SEARCH.lock().await;
         let client = crate::client::get_client();
-        if let Some(filter) = filter {
-            filter.apply(&client)?;
-        }
-
         let (tx, rx) = oneshot::channel();
-
-        client.matchmaking().request_lobby_list(move |lobbies| {
-            let _ = tx.send(lobbies);
-        });
+        crate::api::runtime::without_dispatch(|| -> Result<(), Error> {
+            if let Some(filter) = filter {
+                filter.apply(&client)?;
+            }
+            client.matchmaking().request_lobby_list(move |lobbies| {
+                let _ = tx.send(lobbies);
+            });
+            Ok(())
+        })?;
 
         tokio::time::timeout(std::time::Duration::from_secs(30), rx)
             .await

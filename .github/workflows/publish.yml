@@ -1,8 +1,8 @@
-name: Publish
+name: Platform CI
 
 on:
     push:
-        branches: [main]
+        branches: [main, 'ci/**']
     pull_request:
     workflow_dispatch:
 
@@ -15,6 +15,7 @@ env:
 
 jobs:
     check:
+        name: Rust checks
         runs-on: ubuntu-latest
 
         steps:
@@ -35,12 +36,14 @@ jobs:
               run: cargo test --locked --lib
 
     build:
+        name: Build Linux x64 (glibc 2.31)
         runs-on: ubuntu-latest
 
         container:
             image: ubuntu:20.04
 
         steps:
+            - run: apt-get update && apt-get install -y ca-certificates curl git build-essential
             - uses: actions/checkout@v4
 
             - name: Setup pnpm
@@ -50,8 +53,6 @@ jobs:
               uses: actions/setup-node@v7
               with:
                   node-version: 22.x
-
-            - run: apt-get update && apt-get install -y curl build-essential
 
             - name: Setup Rust
               uses: dtolnay/rust-toolchain@stable
@@ -70,6 +71,13 @@ jobs:
                   pnpm run build --target x86_64-unknown-linux-gnu
                   test -s client.d.ts && test -s index.d.ts
 
+            - name: Check 0.13 contracts against the Linux release addon
+              run: |
+                  pnpm exec tsc --strict --noEmit --target es2020 --module node16 --types node test/v013-*/*.ts test/game-server-fixture/types.ts
+                  pnpm run test:steamworks-013
+                  sh test/game-server-fixture/run.sh dist/linux64/steamworksjs.linux-x64-gnu.node
+                  sh test/inventory-fixture/run.sh dist/linux64/steamworksjs.linux-x64-gnu.node
+
             - uses: actions/upload-artifact@v7
               with:
                   name: declarations
@@ -84,7 +92,8 @@ jobs:
                   if-no-files-found: error
 
     build-windows:
-        runs-on: windows-latest
+        name: Build Windows x64 (MSVC)
+        runs-on: windows-2022
         steps:
             - uses: actions/checkout@v4
             - uses: pnpm/action-setup@v6
@@ -134,8 +143,8 @@ jobs:
             - run: pnpm run build --target ${{ matrix.target }}
             - name: Offline Steam SDK fixtures
               run: |
-                  sh test/game-server-fixture/run.sh
-                  sh test/inventory-fixture/run.sh
+                  sh test/game-server-fixture/run.sh "dist/osx/steamworksjs.darwin-$(node -p process.arch).node"
+                  sh test/inventory-fixture/run.sh "dist/osx/steamworksjs.darwin-$(node -p process.arch).node"
 
             - name: Upload artifact
               uses: actions/upload-artifact@v7
@@ -163,6 +172,7 @@ jobs:
                   name: declarations
             - run: pnpm install --frozen-lockfile
             - run: pnpm --dir test/typescript run compile
+            - run: node test/overlay-lifecycle.cjs
             - name: Pack and verify the release payload
               run: |
                   pnpm pack --pack-destination "$RUNNER_TEMP"
@@ -189,47 +199,132 @@ jobs:
                   if-no-files-found: error
 
     verify-package:
-        name: Node and Electron / ${{ matrix.platform }}-${{ matrix.arch }}
+        name: Packed addon / ${{ matrix.os }} / ${{ matrix.arch }} / Node ${{ matrix.node }}
         needs: package
+        timeout-minutes: 20
         strategy:
             fail-fast: false
             matrix:
+                node: [22, 24, 26]
+                os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, windows-2022, windows-2025, macos-15, macos-15-intel, macos-26, macos-26-intel]
                 include:
-                    - { os: ubuntu-latest, platform: linux, arch: x64 }
-                    - { os: windows-latest, platform: win32, arch: x64 }
+                    - { os: ubuntu-22.04, platform: linux, arch: x64 }
+                    - { os: ubuntu-24.04, platform: linux, arch: x64 }
+                    - { os: ubuntu-26.04, platform: linux, arch: x64 }
+                    - { os: windows-2022, platform: win32, arch: x64 }
+                    - { os: windows-2025, platform: win32, arch: x64 }
                     - { os: macos-15, platform: darwin, arch: arm64 }
                     - { os: macos-15-intel, platform: darwin, arch: x64 }
+                    - { os: macos-26, platform: darwin, arch: arm64 }
+                    - { os: macos-26-intel, platform: darwin, arch: x64 }
         runs-on: ${{ matrix.os }}
         steps:
             - uses: actions/checkout@v4
             - uses: pnpm/action-setup@v6
             - uses: actions/setup-node@v7
               with:
-                  node-version: 22.x
+                  node-version: ${{ matrix.node }}
+                  architecture: ${{ matrix.arch }}
             - run: pnpm install --frozen-lockfile
             - uses: actions/download-artifact@v8
               with:
                   name: npm-package
-            - shell: bash
+            - name: Install under steamworks.js and check its native API
+              shell: bash
+              env:
+                  EXPECTED_PLATFORM: ${{ matrix.platform }}
+                  EXPECTED_ARCH: ${{ matrix.arch }}
+                  EXPECTED_NODE: ${{ matrix.node }}
               run: |
-                  tar -xzf ./*.tgz
-                  node test/package-smoke.js package
-                  (cd package && node ../test/networking-sockets.js)
+                  node -e "const a=require('node:assert/strict'); a.equal(process.platform,process.env.EXPECTED_PLATFORM); a.equal(process.arch,process.env.EXPECTED_ARCH); a.equal(process.versions.node.split('.')[0],process.env.EXPECTED_NODE); console.log(process.version, process.platform, process.arch)"
+                  consumer="$RUNNER_TEMP/deviation-consumer"
+                  mkdir -p "$consumer"
+                  cp ./*.tgz "$consumer/steamworks.tgz"
+                  cp test/deviation-game/consumer.ts "$consumer/"
+                  cd "$consumer"
+                  echo '{"private":true,"dependencies":{"steamworks.js":"file:./steamworks.tgz"}}' > package.json
+                  pnpm install --ignore-scripts --no-frozen-lockfile
+                  "$GITHUB_WORKSPACE/node_modules/.bin/tsc" --strict --noEmit --esModuleInterop consumer.ts
+                  node -e "require('node:assert/strict').equal(require('steamworks.js/package.json').name, '@kyeshmz/steamworks.ts')"
+                  node "$GITHUB_WORKSPACE/test/package-smoke.js" node_modules/steamworks.js
+                  (cd node_modules/steamworks.js && node "$GITHUB_WORKSPACE/test/networking-sockets.js")
+            - name: Compare the published 0.4.0 game dependency and ticket behavior
+              if: matrix.os == 'ubuntu-24.04' && matrix.node == 22
+              shell: bash
+              run: |
+                  reference="$RUNNER_TEMP/reference-consumer"
+                  consumer="$RUNNER_TEMP/deviation-consumer"
+                  mkdir "$reference"
+                  echo '{"private":true,"dependencies":{"steamworks.js":"0.4.0"}}' > "$reference/package.json"
+                  pnpm --dir "$reference" install --ignore-scripts --no-frozen-lockfile
+                  node test/deviation-game/surface.cjs "$reference/node_modules/steamworks.js" "$consumer/node_modules/steamworks.js"
+                  sh test/deviation-native/run.sh "$reference/node_modules/steamworks.js"
+                  BASELINE_PACKAGE="$reference/node_modules/steamworks.js" sh test/v013-callbacks/run.sh
+                  sh test/deviation-native/run.sh "$consumer/node_modules/steamworks.js"
+                  sh test/deviation-native/run.sh "$consumer/node_modules/steamworks.js" overlap
             - name: Load the release package in Electron
+              if: matrix.node == 22
               shell: bash
               env:
                   EXPECTED_PLATFORM: ${{ matrix.platform }}
                   EXPECTED_ARCH: ${{ matrix.arch }}
               run: |
                   if [[ "$RUNNER_OS" == Linux ]]; then
-                      xvfb-run -a pnpm exec electron test/electron-package-smoke.cjs package
+                      helper=/opt/google/chrome/chrome-sandbox
+                      if [[ -u "$helper" && "$(stat -c %u "$helper")" == 0 ]]; then
+                          ln -sf "$helper" "$(node -p "require('node:path').dirname(require('electron'))")/chrome-sandbox"
+                      fi
+                      xvfb-run -a pnpm exec electron test/electron-package-smoke.cjs "$RUNNER_TEMP/deviation-consumer" --mute-audio
                   else
-                      pnpm exec electron test/electron-package-smoke.cjs package
+                      pnpm exec electron test/electron-package-smoke.cjs "$RUNNER_TEMP/deviation-consumer" --mute-audio
                   fi
+
+    linux-distros:
+        name: Packed addon / ${{ matrix.distro.image }} / x64 / Node ${{ matrix.node }}
+        needs: package
+        runs-on: ubuntu-24.04
+        timeout-minutes: 12
+        strategy:
+            fail-fast: false
+            matrix:
+                node: [22, 24, 26]
+                distro:
+                    - { image: 'debian:bookworm-slim', id: debian, version: '12' }
+                    - { image: 'debian:trixie-slim', id: debian, version: '13' }
+                    - { image: 'fedora:44', id: fedora, version: '44' }
+                    - { image: 'rockylinux/rockylinux:9', id: rocky, version: '9' }
+                    - { image: 'archlinux:base', id: arch, version: '-' }
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: ${{ matrix.node }}
+                  package-manager-cache: false
+            - uses: actions/download-artifact@v8
+              with:
+                  name: npm-package
+                  path: ${{ runner.temp }}/candidate
+            - run: sh test/ci-linux-distro.sh "$RUNNER_TEMP"/candidate/*.tgz "$IMAGE" "$DISTRO" "$VERSION" "$NODE_MAJOR"
+              env:
+                  IMAGE: ${{ matrix.distro.image }}
+                  DISTRO: ${{ matrix.distro.id }}
+                  VERSION: ${{ matrix.distro.version }}
+                  NODE_MAJOR: ${{ matrix.node }}
+
+    compatibility:
+        name: Platform compatibility
+        if: always()
+        needs: [verify-package, linux-distros]
+        runs-on: ubuntu-latest
+        steps:
+            - run: test "$HOSTS" = success && test "$DISTROS" = success
+              env:
+                  HOSTS: ${{ needs.verify-package.result }}
+                  DISTROS: ${{ needs.linux-distros.result }}
 
     release:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        needs: verify-package
+        needs: compatibility
         runs-on: ubuntu-latest
         permissions:
             contents: write
@@ -251,9 +346,9 @@ jobs:
               run: gh release upload "$TAG" ./*.tgz --repo "$GITHUB_REPOSITORY"
 
     publish:
-        needs: [verify-package, release]
+        needs: [compatibility, release]
         if: >-
-            always() && needs.verify-package.result == 'success' &&
+            always() && needs.compatibility.result == 'success' &&
             ((needs.release.result == 'success' && needs.release.outputs.sha == github.sha) ||
              (github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')))
         runs-on: ubuntu-latest

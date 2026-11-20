@@ -3,6 +3,7 @@ use napi_derive::napi;
 #[napi]
 pub mod auth {
     use std::net::SocketAddr;
+    use std::sync::{Mutex as StdMutex, OnceLock};
 
     use napi::bindgen_prelude::{BigInt, Buffer, Error};
     use napi::Env;
@@ -18,6 +19,168 @@ pub mod auth {
 
     lazy_static! {
         static ref ENCRYPTED_TICKET_SLOT: Mutex<()> = Mutex::new(());
+        static ref SESSION_REQUESTS: StdMutex<Pending<Result<(), String>>> =
+            StdMutex::new(Pending::default());
+        static ref WEB_REQUESTS: StdMutex<Pending<Result<Vec<u8>, String>>> =
+            StdMutex::new(Pending::default());
+    }
+
+    struct Pending<V>(Vec<(AuthTicket, oneshot::Sender<V>)>);
+
+    impl<V> Default for Pending<V> {
+        fn default() -> Self {
+            Self(Vec::new())
+        }
+    }
+
+    impl<V> Pending<V> {
+        fn insert(&mut self, handle: AuthTicket, sender: oneshot::Sender<V>) {
+            self.0.push((handle, sender));
+        }
+
+        fn take(&mut self, handle: &AuthTicket) -> Option<oneshot::Sender<V>> {
+            self.0
+                .iter()
+                .position(|(key, _)| key == handle)
+                .map(|index| self.0.swap_remove(index).1)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::{get_session_ticket_with_steam_id, session_peer, web_ticket_result};
+        use napi::bindgen_prelude::BigInt;
+        use std::future::Future;
+        use std::task::{Context, Poll, Waker};
+        use steamworks::{sys, Callback, TicketForWebApiResponse};
+
+        fn response(length: i32, result: sys::EResult) -> TicketForWebApiResponse {
+            let mut raw = sys::GetTicketForWebApiResponse_t {
+                m_hAuthTicket: 1,
+                m_eResult: result,
+                m_cubTicket: length,
+                m_rgubTicket: [7; 2560],
+            };
+            unsafe { TicketForWebApiResponse::from_raw(&mut raw as *mut _ as *mut _) }
+        }
+
+        #[test]
+        fn web_ticket_rejects_invalid_lengths_and_preserves_status_errors() {
+            for length in [-1, 0, 2561] {
+                assert!(web_ticket_result(response(length, sys::EResult::k_EResultOK)).is_err());
+            }
+            assert_eq!(
+                web_ticket_result(response(3, sys::EResult::k_EResultOK)).unwrap(),
+                vec![7, 7, 7]
+            );
+            assert_eq!(
+                web_ticket_result(response(2560, sys::EResult::k_EResultOK)).unwrap(),
+                vec![7; 2560]
+            );
+            let error = web_ticket_result(response(-1, sys::EResult::k_EResultFail)).unwrap_err();
+            assert_eq!(error, "a generic failure from the steamworks API");
+        }
+
+        #[test]
+        fn invalid_session_peers_fail_before_request_submission() {
+            for (sign_bit, words) in [(false, vec![0]), (true, vec![1]), (false, vec![1, 1])] {
+                let mut request = Box::pin(get_session_ticket_with_steam_id(
+                    BigInt { sign_bit, words },
+                    None,
+                ));
+                let mut cx = Context::from_waker(Waker::noop());
+                assert!(matches!(
+                    request.as_mut().poll(&mut cx),
+                    Poll::Ready(Err(_))
+                ));
+            }
+            for raw in [1, u64::MAX] {
+                assert_eq!(
+                    session_peer(BigInt {
+                        sign_bit: false,
+                        words: vec![raw],
+                    })
+                    .unwrap()
+                    .raw(),
+                    raw
+                );
+            }
+        }
+    }
+
+    fn register_ticket_callbacks(client: &steamworks::Client) {
+        static CALLBACKS: OnceLock<(steamworks::CallbackHandle, steamworks::CallbackHandle)> =
+            OnceLock::new();
+        CALLBACKS.get_or_init(|| {
+            let session = client.register_callback(|response: AuthSessionTicketResponse| {
+                let sender = SESSION_REQUESTS.lock().unwrap().take(&response.ticket);
+                if let Some(sender) = sender {
+                    let _ = sender.send(response.result.map_err(|error| error.to_string()));
+                }
+            });
+            let web = client.register_callback(|response: TicketForWebApiResponse| {
+                let sender = WEB_REQUESTS.lock().unwrap().take(&response.ticket_handle);
+                if let Some(sender) = sender {
+                    let _ = sender.send(web_ticket_result(response));
+                }
+            });
+            (session, web)
+        });
+    }
+
+    fn web_ticket_result(response: TicketForWebApiResponse) -> Result<Vec<u8>, String> {
+        response.result.map_err(|error| error.to_string())?;
+        let length = usize::try_from(response.ticket_len)
+            .ok()
+            .filter(|length| *length > 0 && *length <= response.ticket.len())
+            .ok_or_else(|| "Steam returned an invalid web API ticket length".to_string())?;
+        let mut ticket = response.ticket;
+        ticket.truncate(length);
+        Ok(ticket)
+    }
+
+    async fn wait_for_ticket<T>(
+        rx: oneshot::Receiver<Result<T, String>>,
+        timeout_seconds: Option<u32>,
+    ) -> Result<T, Error> {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(u64::from(timeout_seconds.unwrap_or(10))),
+            rx,
+        )
+        .await
+        .map_err(|_| Error::from_reason("Steam didn't validated the ticket in time."))?
+        .map_err(|error| Error::from_reason(error.to_string()))?
+        .map_err(Error::from_reason)
+    }
+
+    enum TicketKind {
+        Session,
+        Web,
+    }
+
+    struct PendingTicket {
+        handle: AuthTicket,
+        kind: TicketKind,
+        completed: bool,
+    }
+
+    impl Drop for PendingTicket {
+        fn drop(&mut self) {
+            if self.completed {
+                return;
+            }
+            match self.kind {
+                TicketKind::Session => {
+                    SESSION_REQUESTS.lock().unwrap().take(&self.handle);
+                }
+                TicketKind::Web => {
+                    WEB_REQUESTS.lock().unwrap().take(&self.handle);
+                }
+            }
+            crate::client::get_client()
+                .user()
+                .cancel_authentication_ticket(self.handle);
+        }
     }
 
     fn steam_user() -> Result<*mut sys::ISteamUser, Error> {
@@ -74,15 +237,18 @@ pub mod auth {
     #[napi]
     pub struct Ticket {
         pub(crate) data: Vec<u8>,
-        pub(crate) handle: AuthTicket,
+        pub(crate) handle: Option<AuthTicket>,
     }
 
     #[napi]
     impl Ticket {
         #[napi]
         pub fn cancel(&mut self) {
-            let client = crate::client::get_client();
-            client.user().cancel_authentication_ticket(self.handle);
+            if let Some(handle) = self.handle.take() {
+                crate::client::get_client()
+                    .user()
+                    .cancel_authentication_ticket(handle);
+            }
         }
 
         #[napi]
@@ -97,7 +263,7 @@ pub mod auth {
         timeout_seconds: Option<u32>,
     ) -> Result<Ticket, Error> {
         get_session_ticket(
-            NetworkingIdentity::new_steam_id(SteamId::from_raw(steam_id64.get_u64().1)),
+            NetworkingIdentity::new_steam_id(session_peer(steam_id64)?),
             timeout_seconds,
         )
         .await
@@ -119,56 +285,26 @@ pub mod auth {
         timeout_seconds: Option<u32>,
     ) -> Result<Ticket, Error> {
         let client = crate::client::get_client();
+        register_ticket_callbacks(&client);
         let (tx, rx) = oneshot::channel();
-        let mut tx = Some(tx);
-
-        let (ticket_handle, ticket) = client
-            .user()
-            .authentication_session_ticket(network_identity);
-
-        let callback =
-            client.register_callback(move |session_ticket_response: AuthSessionTicketResponse| {
-                if session_ticket_response.ticket == ticket_handle {
-                    if let Some(tx) = tx.take() {
-                        tx.send(match session_ticket_response.result {
-                            Ok(()) => Ok(()),
-                            Err(e) => Err(Error::from_reason(e.to_string())),
-                        })
-                        .unwrap();
-                    }
-                }
-            });
-
-        let mut ticket = Ticket {
-            data: ticket,
+        let (ticket_handle, ticket) = crate::api::runtime::without_dispatch(|| {
+            let (handle, ticket) = client
+                .user()
+                .authentication_session_ticket(network_identity);
+            SESSION_REQUESTS.lock().unwrap().insert(handle, tx);
+            (handle, ticket)
+        });
+        let mut pending = PendingTicket {
             handle: ticket_handle,
+            kind: TicketKind::Session,
+            completed: false,
         };
-
-        let timeout_seconds = u64::from(timeout_seconds.unwrap_or(10));
-        let result =
-            tokio::time::timeout(std::time::Duration::from_secs(timeout_seconds), rx).await;
-
-        drop(callback);
-
-        match result {
-            Ok(result) => match result {
-                Ok(Ok(())) => Ok(ticket),
-                Ok(Err(e)) => {
-                    ticket.cancel();
-                    Err(e)
-                }
-                Err(e) => {
-                    ticket.cancel();
-                    Err(Error::from_reason(e.to_string()))
-                }
-            },
-            Err(_) => {
-                ticket.cancel();
-                Err(Error::from_reason(
-                    "Steam didn't validated the ticket in time.",
-                ))
-            }
-        }
+        wait_for_ticket(rx, timeout_seconds).await?;
+        pending.completed = true;
+        Ok(Ticket {
+            data: ticket,
+            handle: Some(ticket_handle),
+        })
     }
 
     #[napi]
@@ -176,58 +312,30 @@ pub mod auth {
         identity: String,
         timeout_seconds: Option<u32>,
     ) -> Result<Ticket, Error> {
-        let client = crate::client::get_client();
-        let (tx, rx) = oneshot::channel();
-        let mut tx = Some(tx);
-
-        let ticket_handle = client
-            .user()
-            .authentication_session_ticket_for_webapi(&identity);
-
-        let callback =
-            client.register_callback(move |ticket_for_webapi_response: TicketForWebApiResponse| {
-                if ticket_for_webapi_response.ticket_handle == ticket_handle {
-                    let mut ticket = ticket_for_webapi_response.ticket;
-                    ticket.truncate(ticket_for_webapi_response.ticket_len as usize);
-
-                    if let Some(tx) = tx.take() {
-                        tx.send(match ticket_for_webapi_response.result {
-                            Ok(()) => Ok(ticket),
-                            Err(e) => Err(Error::from_reason(e.to_string())),
-                        })
-                        .unwrap();
-                    }
-                }
-            });
-
-        let timeout_seconds = u64::from(timeout_seconds.unwrap_or(10));
-        let result =
-            tokio::time::timeout(std::time::Duration::from_secs(timeout_seconds), rx).await;
-
-        drop(callback);
-
-        match result {
-            Ok(result) => match result {
-                Ok(Ok(data)) => Ok(Ticket {
-                    handle: ticket_handle,
-                    data,
-                }),
-                Ok(Err(e)) => {
-                    client.user().cancel_authentication_ticket(ticket_handle);
-                    Err(e)
-                }
-                Err(e) => {
-                    client.user().cancel_authentication_ticket(ticket_handle);
-                    Err(Error::from_reason(e.to_string()))
-                }
-            },
-            Err(_) => {
-                client.user().cancel_authentication_ticket(ticket_handle);
-                Err(Error::from_reason(
-                    "Steam didn't validated the ticket in time.",
-                ))
-            }
+        if identity.as_bytes().contains(&0) {
+            return Err(Error::from_reason("Identity cannot contain a NUL byte"));
         }
+        let client = crate::client::get_client();
+        register_ticket_callbacks(&client);
+        let (tx, rx) = oneshot::channel();
+        let ticket_handle = crate::api::runtime::without_dispatch(|| {
+            let handle = client
+                .user()
+                .authentication_session_ticket_for_webapi(&identity);
+            WEB_REQUESTS.lock().unwrap().insert(handle, tx);
+            handle
+        });
+        let mut pending = PendingTicket {
+            handle: ticket_handle,
+            kind: TicketKind::Web,
+            completed: false,
+        };
+        let data = wait_for_ticket(rx, timeout_seconds).await?;
+        pending.completed = true;
+        Ok(Ticket {
+            handle: Some(ticket_handle),
+            data,
+        })
     }
 
     fn encrypted_ticket_response(

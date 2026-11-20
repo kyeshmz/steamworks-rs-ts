@@ -31,6 +31,30 @@ static struct validation validation;
 static _Thread_local bool auth_thread;
 static int accepted, rejected, ended, delivered, freed;
 static bool active;
+static atomic_int keyboard_event;
+static atomic_bool hold_keyboard, release_keyboard;
+static _Thread_local bool dispatching_keyboard;
+static struct { bool submitted; uint32_t length, app; } dismissed = { true, 4, 480 };
+
+bool SteamAPI_ISteamUtils_ShowGamepadTextInput(void *p, int mode, int lines, const char *description, uint32_t max, const char *existing) {
+    assert(p == &init_calls && mode == 0 && lines == 0 && max == 20 && !existing);
+    if (!strcmp(description, "unavailable")) return false;
+    atomic_store(&hold_keyboard, !strcmp(description, "held"));
+    dismissed.submitted = strcmp(description, "cancel") != 0;
+    assert(atomic_exchange(&keyboard_event, 714) == 0);
+    return true;
+}
+bool SteamAPI_ISteamUtils_GetEnteredGamepadTextInput(void *p, char *out, uint32_t capacity) {
+    assert(dispatching_keyboard && dismissed.submitted && capacity >= 5);
+    memcpy(out, "Caf!", 5);
+    return true;
+}
+bool SteamAPI_ISteamUtils_ShowFloatingGamepadTextInput(void *p, int mode, int x, int y, int width, int height) {
+    assert(p == &init_calls && mode == 0 && x == 2 && y == 3 && height == 100);
+    if (!width) return false;
+    assert(atomic_exchange(&keyboard_event, 738) == 0);
+    return true;
+}
 
 void *SteamAPI_SteamUser_v023(void) { return &init_calls; }
 static uint64_t ticket_call;
@@ -78,6 +102,12 @@ void SteamAPI_ISteamUser_EndAuthSession(void *p, uint64_t id) {
     ++ended;
 }
 bool SteamAPI_ManualDispatch_GetNextCallback(int pipe, struct callback_msg *msg) {
+    int key = atomic_load(&hold_keyboard) && !atomic_load(&release_keyboard) ? 0 : atomic_exchange(&keyboard_event, 0);
+    if (key) {
+        dispatching_keyboard = true;
+        *msg = (struct callback_msg){1, key, &dismissed, key == 714 ? sizeof(dismissed) : 1};
+        return true;
+    }
     if (!auth_thread || !active || delivered == 6) return false;
     assert(freed == delivered);
     static struct overlay_activation overlay;
@@ -100,19 +130,53 @@ bool SteamAPI_ManualDispatch_GetNextCallback(int pipe, struct callback_msg *msg)
     return true;
 }
 void SteamAPI_ManualDispatch_FreeLastCallback(int pipe) {
+    if (dispatching_keyboard) { dispatching_keyboard = false; return; }
     assert(auth_thread && freed + 1 == delivered);
     memset(&validation, 0, sizeof(validation));
     ++freed;
 }
 void SteamAPI_Shutdown(void) { assert(false); }
 void *SteamAPI_SteamUtils_v010(void) { return &init_calls; }
-void *SteamAPI_SteamUserStats_v012(void) { return &init_calls; }
-bool SteamAPI_ISteamUserStats_RequestCurrentStats(void *p) { return true; }
 uint32_t SteamAPI_ISteamUtils_GetAppID(void *p) { return 480; }
 void *SteamAPI_SteamInventory_v003(void) { return &init_calls; }
+void *SteamAPI_SteamInput_v006(void) { return &init_calls; }
+int SteamAPI_ISteamInput_GetConnectedControllers(void *p, uint64_t *handles) {
+    assert(p == &init_calls); handles[0] = UINT64_MAX - 7; return 1;
+}
+#pragma pack(push, 1)
+struct digital_action { bool pressed, active; };
+struct analog_action { int mode; float x, y; bool active; };
+#pragma pack(pop)
+struct digital_action SteamAPI_ISteamInput_GetDigitalActionData(void *p, uint64_t controller, uint64_t action) {
+    assert(p == &init_calls && controller == UINT64_MAX - 7 && action == 11);
+    return (struct digital_action){false, true};
+}
+struct analog_action SteamAPI_ISteamInput_GetAnalogActionData(void *p, uint64_t controller, uint64_t action) {
+    assert(p == &init_calls && controller == UINT64_MAX - 7 && action == 22);
+    return (struct analog_action){6, -0.5f, 0.25f, true};
+}
+const char *SteamAPI_ISteamInput_GetStringForActionOrigin(void *p, int origin) {
+    assert(p == &init_calls && (origin == 493 || origin == 494));
+    if (origin == 493) atomic_store(&release_keyboard, true);
+    return "SDK 1.64 origin";
+}
 
 static bool batch;
-void *SteamAPI_SteamFriends_v017(void) { return &init_calls; }
+void *SteamAPI_SteamFriends_v018(void) { return &init_calls; }
+static void (*warning_hook)(int, const char *);
+void SteamAPI_ISteamUtils_SetWarningMessageHook(void *p, void (*hook)(int, const char *)) {
+    assert(p == &init_calls);
+    warning_hook = hook;
+}
+bool SteamAPI_ISteamFriends_HasFriend(void *p, uint64_t id, int flags) {
+    assert(p == &init_calls && id == peer);
+    if (warning_hook) warning_hook(1, "fixture warning");
+    return flags == 4;
+}
+const char *SteamAPI_ISteamFriends_GetPlayerNickname(void *p, uint64_t id) {
+    assert(p == &init_calls);
+    return id == peer ? "Player Two" : "";
+}
 int SteamAPI_ISteamFriends_GetFriendsGroupCount(void *p) { return 2; }
 int16_t SteamAPI_ISteamFriends_GetFriendsGroupIDByIndex(void *p, int i) { return i ? 8 : -2; }
 const char *SteamAPI_ISteamFriends_GetFriendsGroupName(void *p, int16_t id) {

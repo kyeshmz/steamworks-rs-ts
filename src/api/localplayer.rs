@@ -23,6 +23,62 @@ impl PlayerSteamId {
 #[napi]
 pub mod localplayer {
     use super::PlayerSteamId;
+    use napi::bindgen_prelude::{BigInt, Error};
+
+    #[napi(object)]
+    pub struct SteamIdDetails {
+        pub universe: u32,
+        pub account_type: u32,
+        pub is_invalid: bool,
+    }
+
+    #[napi]
+    pub fn get_steam_id_details(steam_id: BigInt) -> Result<SteamIdDetails, Error> {
+        let (negative, id, lossless) = steam_id.get_u64();
+        if negative || !lossless {
+            return Err(Error::from_reason(
+                "Steam ID must be an unsigned 64-bit integer",
+            ));
+        }
+        let universe = match id >> 56 {
+            value @ 1..=4 => value as u32,
+            _ => 0,
+        };
+        let id = steamworks::SteamId::from_raw(id);
+        Ok(SteamIdDetails {
+            universe,
+            account_type: id.account_type() as u32,
+            is_invalid: id.is_invalid(),
+        })
+    }
+
+    #[napi]
+    pub enum UserHasLicense {
+        HasLicense,
+        DoesNotHaveLicense,
+        NoAuth,
+    }
+
+    #[napi]
+    pub fn user_has_license_for_app(
+        steam_id: BigInt,
+        app_id: u32,
+    ) -> Result<UserHasLicense, Error> {
+        let (negative, id, lossless) = steam_id.get_u64();
+        if negative || !lossless {
+            return Err(Error::from_reason(
+                "Steam ID must be an unsigned 64-bit integer",
+            ));
+        }
+        let result = crate::client::get_client()
+            .user()
+            .user_has_license_for_app(steamworks::SteamId::from_raw(id), steamworks::AppId(app_id));
+        Ok(match result {
+            steamworks::UserHasLicense::HasLicense => UserHasLicense::HasLicense,
+            steamworks::UserHasLicense::DoesNotHaveLicense => UserHasLicense::DoesNotHaveLicense,
+            steamworks::UserHasLicense::NoAuth => UserHasLicense::NoAuth,
+        })
+    }
 
     #[napi]
     pub fn get_steam_id() -> PlayerSteamId {

@@ -131,7 +131,7 @@ pub mod leaderboards {
         let send = move |result| {
             let _ = tx.send(result);
         };
-        match create {
+        crate::api::runtime::without_dispatch(|| match create {
             Some((sort, display)) => client.user_stats().find_or_create_leaderboard(
                 name,
                 sort.into(),
@@ -139,7 +139,7 @@ pub mod leaderboards {
                 send,
             ),
             None => client.user_stats().find_leaderboard(name, send),
-        }
+        });
         callback(rx).await
     }
 
@@ -194,15 +194,17 @@ pub mod leaderboards {
             .await?
             .ok_or_else(|| Error::from_reason("Could not find or create leaderboard"))?;
         let (tx, rx) = oneshot::channel();
-        client.user_stats().upload_leaderboard_score(
-            &board,
-            method.into(),
-            score,
-            &details,
-            move |result| {
-                let _ = tx.send(result);
-            },
-        );
+        crate::api::runtime::without_dispatch(|| {
+            client.user_stats().upload_leaderboard_score(
+                &board,
+                method.into(),
+                score,
+                &details,
+                move |result| {
+                    let _ = tx.send(result);
+                },
+            )
+        });
         let uploaded = callback(rx)
             .await?
             .ok_or_else(|| Error::from_reason("Steam rejected leaderboard score upload"))?;
@@ -236,27 +238,26 @@ pub mod leaderboards {
         let client = crate::client::get_client();
         let board = existing(&client, &name).await?;
         let (tx, rx) = oneshot::channel();
-        client.user_stats().download_leaderboard_entries(
-            &board,
-            request.into(),
-            range_start as usize,
-            range_end as usize,
-            MAX_DETAILS,
-            move |result| {
-                let _ = tx.send(result);
-            },
-        );
+        crate::api::runtime::without_dispatch(|| {
+            client.user_stats().download_leaderboard_entries(
+                &board,
+                request.into(),
+                range_start as usize,
+                range_end as usize,
+                limit,
+                move |result| {
+                    let _ = tx.send(result);
+                },
+            )
+        });
         Ok(callback(rx)
             .await?
             .into_iter()
-            .map(|mut e| {
-                e.details.truncate(limit);
-                LeaderboardEntry {
-                    steam_id: e.user.raw().into(),
-                    global_rank: e.global_rank,
-                    score: e.score,
-                    details: e.details,
-                }
+            .map(|e| LeaderboardEntry {
+                steam_id: e.user.raw().into(),
+                global_rank: e.global_rank,
+                score: e.score,
+                details: e.details,
             })
             .collect())
     }

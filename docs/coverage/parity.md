@@ -2,6 +2,8 @@
 
 See the [implementation plan](implementation-plan.md) for the six previously confirmed gaps. The [generated ledger](parity-ledger.md) distinguishes reviewed operations, naming differences, and entries still awaiting comparison. Matching names do not establish behavioral parity.
 
+The [Steamworks 0.13 verification record](steamworks-013-verification.md) covers the separate Linux release and packaged Deviation Game compatibility checks.
+
 ## What to do next
 
 | Priority | Evidence and decision |
@@ -30,7 +32,7 @@ For [Gurigraphics](https://github.com/Gurigraphics/steamworks.js/tree/473866aeb6
 
 GitHub reported 10 forks and network size 10. All [ten public default branches](parity-ffi-forks.json) were fetched by name and pinned. Nine tips are identical to or ancestors of pinned ArtyProf main and therefore introduce no fork-specific changes. Only [kiranipiebox](https://github.com/kiranipiebox/steamworks-ffi-node/commit/83786f1d62708d63312a1aa588a8223e9a12aabb) diverges from its merge base `7741550942964f6428517ff0a4cf90c53ca2e902`. Across all ten: **zero additional public method paths**, one implementation change.
 
-The divergent commit changes three source files and one documentation file. Ignoring whitespace, it replaces the fixed `SteamAPI_SteamApps_v008` accessor with `v009` in the loader, core and apps manager. It does not add an Apps operation. [Pinned ArtyProf main](https://github.com/ArtyProf/steamworks-ffi-node/blob/f5ce2b7dc194672ed45f7352c9e325d12451028f/src/internal/SteamLibraryLoader.ts) instead probes versioned accessors and selects the highest available one, including v009 when exported. Our Rust binding uses the pinned SDK's v008 accessor in `src/api/apps.rs`; neither runtime compatibility with another SDK nor identical ABI behavior follows from matching JS method names.
+The divergent commit changes three source files and one documentation file. Ignoring whitespace, it replaces the fixed `SteamAPI_SteamApps_v008` accessor with `v009` in the loader, core and apps manager. It does not add an Apps operation. [Pinned ArtyProf main](https://github.com/ArtyProf/steamworks-ffi-node/blob/f5ce2b7dc194672ed45f7352c9e325d12451028f/src/internal/SteamLibraryLoader.ts) instead probes versioned accessors and selects the highest available one, including v009 when exported. The current Rust binding uses SDK 1.64's `SteamAPI_SteamApps_v009` accessor in `src/api/apps.rs`. Matching JS method names does not establish runtime compatibility with a different SDK binary.
 
 The renderer lists *all* paths changed since each merge base and compares divergent public method paths with both base and pinned main. Recheck the logic review with `git diff -w 7741550942964f6428517ff0a4cf90c53ca2e902 83786f1d62708d63312a1aa588a8223e9a12aabb`. Comparing only tip to main would wrongly attribute intervening main changes to this fork. This snapshot does not inspect nondefault branches, private/detached repositories, unmerged ArtyProf PR heads or later changes.
 

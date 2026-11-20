@@ -2,21 +2,54 @@ use napi_derive::napi;
 
 #[napi]
 pub mod utils {
+    use std::ffi::{CStr, CString};
+    use steamworks::sys;
     use steamworks::FloatingGamepadTextInputMode as kFloatingGamepadTextInputMode;
     use steamworks::GamepadTextInputLineMode as kGamepadTextInputLineMode;
     use steamworks::GamepadTextInputMode as kGamepadTextInputMode;
-    use tokio::sync::oneshot;
+    use tokio::sync::{oneshot, Mutex};
+
+    static GAMEPAD_DIALOG: Mutex<()> = Mutex::const_new(());
+    static FLOATING_DIALOG: Mutex<()> = Mutex::const_new(());
 
     #[napi]
     pub fn is_steam_in_big_picture_mode() -> napi::Result<bool> {
         let _client = crate::client::get_client();
-        unsafe {
-            let utils = steamworks::sys::SteamAPI_SteamUtils_v010();
-            if utils.is_null() {
-                return Err(napi::Error::from_reason("Steam utilities unavailable"));
-            }
-            Ok(steamworks::sys::SteamAPI_ISteamUtils_IsSteamInBigPictureMode(utils))
+        let utils = unsafe { sys::SteamAPI_SteamUtils_v010() };
+        if utils.is_null() {
+            return Err(napi::Error::from_reason("Steam utilities unavailable"));
         }
+        Ok(unsafe { sys::SteamAPI_ISteamUtils_IsSteamInBigPictureMode(utils) })
+    }
+
+    #[napi(object, object_from_js = false)]
+    pub struct SteamWarning {
+        pub severity: i32,
+        pub message: String,
+    }
+
+    #[napi(strict)]
+    pub fn set_warning_handler(
+        #[napi(ts_arg_type = "(warning: SteamWarning) => void")] handler: Option<
+            napi::bindgen_prelude::Function<'_, SteamWarning, ()>,
+        >,
+    ) -> napi::Result<()> {
+        let utils = crate::client::get_client().utils();
+        if let Some(handler) = handler {
+            let listener = handler.build_threadsafe_function().weak::<true>().build()?;
+            utils.set_warning_callback(move |severity, message| {
+                listener.call(
+                    SteamWarning {
+                        severity,
+                        message: message.to_string_lossy().into_owned(),
+                    },
+                    napi::threadsafe_function::ThreadsafeFunctionCallMode::NonBlocking,
+                );
+            });
+        } else {
+            utils.set_warning_callback(|_, _| {});
+        }
+        Ok(())
     }
 
     #[napi]
@@ -67,35 +100,71 @@ pub mod utils {
         max_characters: u32,
         existing_text: Option<String>,
     ) -> Option<String> {
+        let _dialog = GAMEPAD_DIALOG.try_lock().ok()?;
+        let description = CString::new(description).ok()?;
+        let existing_text = existing_text.map(CString::new).transpose().ok()?;
         let client = crate::client::get_client();
-
         let (tx, rx) = oneshot::channel();
         let mut tx = Some(tx);
-
-        let opened = client.utils().show_gamepad_text_input(
-            match input_mode {
-                GamepadTextInputMode::Normal => kGamepadTextInputMode::Normal,
-                GamepadTextInputMode::Password => kGamepadTextInputMode::Password,
-            },
-            match input_line_mode {
-                GamepadTextInputLineMode::SingleLine => kGamepadTextInputLineMode::SingleLine,
-                GamepadTextInputLineMode::MultipleLines => kGamepadTextInputLineMode::MultipleLines,
-            },
-            &description,
-            max_characters,
-            existing_text.as_deref(),
-            move |dismissed_data| {
+        let _dismissed =
+            client.register_callback(move |event: steamworks::GamepadTextInputDismissed| {
                 if let Some(tx) = tx.take() {
-                    let text = client
-                        .utils()
-                        .get_entered_gamepad_text_input(&dismissed_data);
-                    tx.send(text).unwrap();
+                    let text = event.submitted_text_len.and_then(|length| {
+                        let capacity = length.checked_add(1)?;
+                        if capacity > 1024 * 1024 {
+                            return None;
+                        }
+                        let mut bytes = vec![0u8; capacity as usize];
+                        unsafe {
+                            let utils = sys::SteamAPI_SteamUtils_v010();
+                            if utils.is_null()
+                                || !sys::SteamAPI_ISteamUtils_GetEnteredGamepadTextInput(
+                                    utils,
+                                    bytes.as_mut_ptr().cast(),
+                                    capacity,
+                                )
+                            {
+                                return None;
+                            }
+                        }
+                        CStr::from_bytes_until_nul(&bytes)
+                            .ok()?
+                            .to_str()
+                            .ok()
+                            .map(str::to_owned)
+                    });
+                    let _ = tx.send(text);
                 }
-            },
-        );
+            });
+        let opened = unsafe {
+            let utils = sys::SteamAPI_SteamUtils_v010();
+            !utils.is_null()
+                && sys::SteamAPI_ISteamUtils_ShowGamepadTextInput(
+                    utils,
+                    match input_mode {
+                        GamepadTextInputMode::Normal => kGamepadTextInputMode::Normal,
+                        GamepadTextInputMode::Password => kGamepadTextInputMode::Password,
+                    }
+                    .into(),
+                    match input_line_mode {
+                        GamepadTextInputLineMode::SingleLine => {
+                            kGamepadTextInputLineMode::SingleLine
+                        }
+                        GamepadTextInputLineMode::MultipleLines => {
+                            kGamepadTextInputLineMode::MultipleLines
+                        }
+                    }
+                    .into(),
+                    description.as_ptr(),
+                    max_characters,
+                    existing_text
+                        .as_ref()
+                        .map_or(std::ptr::null(), |s| s.as_ptr()),
+                )
+        };
 
         if opened {
-            rx.await.unwrap()
+            rx.await.ok().flatten()
         } else {
             None
         }
@@ -117,37 +186,42 @@ pub mod utils {
         width: i32,
         height: i32,
     ) -> bool {
+        let Ok(_dialog) = FLOATING_DIALOG.try_lock() else {
+            return false;
+        };
         let client = crate::client::get_client();
-
         let (tx, rx) = oneshot::channel();
         let mut tx = Some(tx);
-
-        let opened = client.utils().show_floating_gamepad_text_input(
-            match keyboard_mode {
-                FloatingGamepadTextInputMode::SingleLine => {
-                    kFloatingGamepadTextInputMode::SingleLine
-                }
-                FloatingGamepadTextInputMode::MultipleLines => {
-                    kFloatingGamepadTextInputMode::MultipleLines
-                }
-                FloatingGamepadTextInputMode::Email => kFloatingGamepadTextInputMode::Email,
-                FloatingGamepadTextInputMode::Numeric => kFloatingGamepadTextInputMode::Numeric,
-            },
-            x,
-            y,
-            width,
-            height,
-            move || {
+        let _dismissed =
+            client.register_callback(move |_: steamworks::FloatingGamepadTextInputDismissed| {
                 if let Some(tx) = tx.take() {
-                    tx.send(true).unwrap();
+                    let _ = tx.send(());
                 }
-            },
-        );
-
-        if opened {
-            rx.await.unwrap()
-        } else {
-            false
-        }
+            });
+        let opened = unsafe {
+            let utils = sys::SteamAPI_SteamUtils_v010();
+            !utils.is_null()
+                && sys::SteamAPI_ISteamUtils_ShowFloatingGamepadTextInput(
+                    utils,
+                    match keyboard_mode {
+                        FloatingGamepadTextInputMode::SingleLine => {
+                            kFloatingGamepadTextInputMode::SingleLine
+                        }
+                        FloatingGamepadTextInputMode::MultipleLines => {
+                            kFloatingGamepadTextInputMode::MultipleLines
+                        }
+                        FloatingGamepadTextInputMode::Email => kFloatingGamepadTextInputMode::Email,
+                        FloatingGamepadTextInputMode::Numeric => {
+                            kFloatingGamepadTextInputMode::Numeric
+                        }
+                    }
+                    .into(),
+                    x,
+                    y,
+                    width,
+                    height,
+                )
+        };
+        opened && rx.await.is_ok()
     }
 }

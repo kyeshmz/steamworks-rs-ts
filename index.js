@@ -31,6 +31,8 @@ module.exports.init = (appId) => {
 
 module.exports.restartAppIfNecessary = (appId) => nativeBinding.restartAppIfNecessary(appId);
 
+let overlayInvalidationEnabled = false
+
 module.exports.electronEnableSteamOverlay = (disableEachFrameInvalidation) => {
     const electron = require('electron')
     if (!electron) {
@@ -40,15 +42,29 @@ module.exports.electronEnableSteamOverlay = (disableEachFrameInvalidation) => {
     electron.app.commandLine.appendSwitch('in-process-gpu')
     electron.app.commandLine.appendSwitch('disable-direct-composition')
 
-    if (!disableEachFrameInvalidation) {
+    if (!disableEachFrameInvalidation && !overlayInvalidationEnabled) {
+        overlayInvalidationEnabled = true
+        const attachedWindows = new WeakSet()
         const attachFrameInvalidator = (browserWindow) => {
-            browserWindow.steamworksRepaintInterval = setInterval(() => {
-                if (browserWindow.isDestroyed()) {
-                    clearInterval(browserWindow.steamworksRepaintInterval)
-                } else if (!browserWindow.webContents.isPainting()) {
-                    browserWindow.webContents.invalidate()
+            if (browserWindow.isDestroyed() || attachedWindows.has(browserWindow)) return
+            const webContents = browserWindow.webContents
+            if (webContents.isDestroyed()) return
+            attachedWindows.add(browserWindow)
+            const cleanup = () => {
+                clearInterval(interval)
+                attachedWindows.delete(browserWindow)
+                browserWindow.removeListener('closed', cleanup)
+                webContents.removeListener('destroyed', cleanup)
+            }
+            const interval = setInterval(() => {
+                if (browserWindow.isDestroyed() || webContents.isDestroyed()) {
+                    cleanup()
+                } else if (!webContents.isPainting()) {
+                    webContents.invalidate()
                 }
             }, 1000 / 60)
+            browserWindow.once('closed', cleanup)
+            webContents.once('destroyed', cleanup)
         }
 
         electron.BrowserWindow.getAllWindows().forEach(attachFrameInvalidator)

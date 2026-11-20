@@ -9,7 +9,7 @@ macro_rules! scalar_event {
 
         unsafe impl Callback for $name {
             const ID: i32 = sys::$id as i32;
-            const SIZE: i32 = std::mem::size_of::<sys::$raw>() as i32;
+
             unsafe fn from_raw(raw: *mut std::ffi::c_void) -> Self {
                 Self {
                     $field: raw.cast::<sys::$raw>().read_unaligned().$source,
@@ -31,7 +31,7 @@ pub(super) struct InventoryDefinitionUpdate;
 
 unsafe impl Callback for InventoryDefinitionUpdate {
     const ID: i32 = sys::SteamInventoryDefinitionUpdate_t_k_iCallback as i32;
-    const SIZE: i32 = std::mem::size_of::<sys::SteamInventoryDefinitionUpdate_t>() as i32;
+
     unsafe fn from_raw(_: *mut std::ffi::c_void) -> Self {
         Self
     }
@@ -48,7 +48,7 @@ pub struct TicketValidation {
 
 unsafe impl steamworks::Callback for TicketValidation {
     const ID: i32 = sys::ValidateAuthTicketResponse_t_k_iCallback as i32;
-    const SIZE: i32 = std::mem::size_of::<sys::ValidateAuthTicketResponse_t>() as i32;
+
     unsafe fn from_raw(raw: *mut std::ffi::c_void) -> Self {
         let event = raw.cast::<sys::ValidateAuthTicketResponse_t>();
         Self {
@@ -58,6 +58,48 @@ unsafe impl steamworks::Callback for TicketValidation {
             response: std::ptr::addr_of!((*event).m_eAuthSessionResponse)
                 .cast::<u32>()
                 .read_unaligned(),
+        }
+    }
+}
+
+#[napi_derive::napi(object, object_from_js = false)]
+pub struct RelayNetworkStatus {
+    pub availability: i32,
+    #[napi(js_name = "ping_measurement_in_progress")]
+    pub ping_measurement_in_progress: bool,
+    #[napi(js_name = "network_config")]
+    pub network_config: i32,
+    #[napi(js_name = "any_relay")]
+    pub any_relay: i32,
+    #[napi(js_name = "debug_message")]
+    pub debug_message: String,
+}
+
+unsafe impl Callback for RelayNetworkStatus {
+    const ID: i32 = sys::SteamRelayNetworkStatus_t_k_iCallback as i32;
+
+    unsafe fn from_raw(raw: *mut std::ffi::c_void) -> Self {
+        let event = raw.cast::<sys::SteamRelayNetworkStatus_t>();
+        let message = std::ptr::addr_of!((*event).m_debugMsg).read_unaligned();
+        let bytes: Vec<u8> = message
+            .into_iter()
+            .take_while(|&byte| byte != 0)
+            .map(|byte| byte as u8)
+            .collect();
+        Self {
+            availability: std::ptr::addr_of!((*event).m_eAvail)
+                .cast::<i32>()
+                .read_unaligned(),
+            ping_measurement_in_progress: std::ptr::addr_of!((*event).m_bPingMeasurementInProgress)
+                .read_unaligned()
+                != 0,
+            network_config: std::ptr::addr_of!((*event).m_eAvailNetworkConfig)
+                .cast::<i32>()
+                .read_unaligned(),
+            any_relay: std::ptr::addr_of!((*event).m_eAvailAnyRelay)
+                .cast::<i32>()
+                .read_unaligned(),
+            debug_message: String::from_utf8_lossy(&bytes).into_owned(),
         }
     }
 }

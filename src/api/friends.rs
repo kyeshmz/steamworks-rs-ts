@@ -8,7 +8,7 @@ pub mod friends {
 
     fn with_friends<T>(f: impl FnOnce(*mut sys::ISteamFriends) -> T) -> Result<T, Error> {
         let _client = crate::client::get_client();
-        let friends = unsafe { sys::SteamAPI_SteamFriends_v017() };
+        let friends = unsafe { sys::SteamAPI_SteamFriends_v018() };
         if friends.is_null() {
             return Err(Error::from_reason("Steam friends interface unavailable"));
         }
@@ -188,6 +188,24 @@ pub mod friends {
         Ok(crate::client::get_client().friends().get_friend(id).name())
     }
 
+    #[napi(strict)]
+    pub fn get_nickname(steam_id64: BigInt) -> Result<Option<String>, Error> {
+        let id = steam_id(steam_id64)?;
+        Ok(crate::client::get_client()
+            .friends()
+            .get_friend(id)
+            .nick_name())
+    }
+
+    #[napi(strict)]
+    pub fn has_friend(steam_id64: BigInt, filter: Option<FriendFilter>) -> Result<bool, Error> {
+        let id = steam_id(steam_id64)?;
+        Ok(crate::client::get_client()
+            .friends()
+            .get_friend(id)
+            .has_friend(filter.unwrap_or(FriendFilter::Immediate).into()))
+    }
+
     #[napi]
     pub enum AvatarSize {
         Small,
@@ -212,6 +230,7 @@ pub mod friends {
         let id = steam_id(steam_id64)?;
         let friend = crate::client::get_client().friends().get_friend(id);
         let state = match friend.state() {
+            FriendState::Invisible => "invisible",
             FriendState::Online => "online",
             FriendState::Offline => "offline",
             FriendState::Busy => "busy",

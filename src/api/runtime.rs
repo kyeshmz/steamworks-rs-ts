@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError, TryLockError};
 use std::time::Instant;
 
 #[derive(Default)]
@@ -16,20 +16,28 @@ lazy_static! {
     static ref PUMP: Mutex<Pump> = Mutex::new(Pump::default());
 }
 
+pub(crate) fn without_dispatch<T>(f: impl FnOnce() -> T) -> T {
+    let _pump = PUMP.lock().unwrap_or_else(PoisonError::into_inner);
+    f()
+}
+
 pub(crate) fn dispatch() {
-    if let Ok(mut pump) = PUMP.try_lock() {
-        let start = Instant::now();
-        crate::client::get_client().run_callbacks();
-        if let Some(last) = pump.last.replace(start) {
-            let gap = start.duration_since(last).as_micros();
-            pump.gaps += 1;
-            pump.total_gap_us += gap;
-            pump.last_gap_us = gap;
-            pump.max_gap_us = pump.max_gap_us.max(gap);
-        }
-        pump.runs += 1;
-        pump.max_run_us = pump.max_run_us.max(start.elapsed().as_micros());
+    let mut pump = match PUMP.try_lock() {
+        Ok(pump) => pump,
+        Err(TryLockError::WouldBlock) => return,
+        Err(TryLockError::Poisoned(error)) => error.into_inner(),
+    };
+    let start = Instant::now();
+    crate::client::get_client().run_callbacks();
+    if let Some(last) = pump.last.replace(start) {
+        let gap = start.duration_since(last).as_micros();
+        pump.gaps += 1;
+        pump.total_gap_us += gap;
+        pump.last_gap_us = gap;
+        pump.max_gap_us = pump.max_gap_us.max(gap);
     }
+    pump.runs += 1;
+    pump.max_run_us = pump.max_run_us.max(start.elapsed().as_micros());
 }
 
 use napi_derive::napi;
@@ -48,7 +56,9 @@ pub mod runtime {
 
     #[napi]
     pub fn pump_stats(reset: Option<bool>) -> PumpStats {
-        let mut p = super::PUMP.lock().unwrap();
+        let mut p = super::PUMP
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let stats = PumpStats {
             runs: p.runs as f64,
             gaps: p.gaps as f64,

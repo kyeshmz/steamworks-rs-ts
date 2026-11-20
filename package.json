@@ -17,6 +17,12 @@
         "dist/*",
         "index.js",
         "*.d.ts",
+        "docs/deviation-game.md",
+        "docs/steamworks-0.13.md",
+        "docs/remote-play.md",
+        "docs/server-browser.md",
+        "docs/game-server.md",
+        "docs/koffi-vs-rust.md",
         "README.md",
         "CHANGELOG.md"
     ],
@@ -36,7 +42,8 @@
     "scripts": {
         "parity:check": "python3 scripts/audit-upstream.py --check && node scripts/audit-parity.cjs --check",
         "parity:report": "node scripts/audit-parity.cjs",
-        "test:bindings": "tsc --strict --noEmit test/typescript/index.ts && node test/package-smoke.js && node test/networking-sockets.js",
+        "test:bindings": "tsc --strict --noEmit test/typescript/index.ts && node test/package-smoke.js && node test/networking-sockets.js && node test/overlay-lifecycle.cjs",
+        "test:steamworks-013": "sh test/steamworks-013.sh",
         "build": "node build --release",
         "build:debug": "node build",
         "prune": "rimraf dist target client.d.ts",

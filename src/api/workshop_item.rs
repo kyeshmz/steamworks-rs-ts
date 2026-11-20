@@ -437,10 +437,10 @@ pub mod workshop {
         pub consumer: Option<u32>,
     }
 
-    fn handle_query_config<Manager>(
-        mut query_handle: steamworks::QueryHandle<Manager>,
+    fn handle_query_config(
+        mut query_handle: steamworks::QueryHandle,
         query_config: &WorkshopItemQueryConfig,
-    ) -> steamworks::QueryHandle<Manager> {
+    ) -> steamworks::QueryHandle {
         if let Some(children) = query_config.return_children {
             query_handle = query_handle.set_return_children(children);
         }
@@ -501,8 +501,11 @@ pub mod workshop {
         item: BigInt,
         query_config: Option<WorkshopItemQueryConfig>,
     ) -> Result<Option<WorkshopItem>, Error> {
-        let query_config = query_config.unwrap_or_default();
+        let mut query_config = query_config.unwrap_or_default();
         query_config.validate(false)?;
+        if query_config.only_ids == Some(true) {
+            query_config.only_ids = None;
+        }
         let item = published_file_id(&item)?;
         let client = crate::client::get_client();
         let (tx, rx) = oneshot::channel();
@@ -515,16 +518,19 @@ pub mod workshop {
 
             query_handle = handle_query_config(query_handle, &query_config);
 
-            query_handle.fetch(move |fetch_result| {
-                tx.send(fetch_result.map(|query_results| {
-                    WorkshopItem::from_query_results(&query_results, 0, &query_config)
-                }))
-                .unwrap();
+            crate::api::runtime::without_dispatch(|| {
+                query_handle.fetch(move |fetch_result| {
+                    let _ = tx.send(fetch_result.map(|query_results| {
+                        WorkshopItem::from_query_results(&query_results, 0, &query_config)
+                    }));
+                });
             });
         }
 
-        rx.await
-            .unwrap()
+        tokio::time::timeout(std::time::Duration::from_secs(30), rx)
+            .await
+            .map_err(|_| Error::from_reason("Timed out waiting for workshop query callback"))?
+            .map_err(|_| Error::from_reason("Workshop query callback dropped"))?
             .map_err(|e| Error::from_reason(e.to_string()))
     }
 
@@ -533,8 +539,11 @@ pub mod workshop {
         items: Vec<BigInt>,
         query_config: Option<WorkshopItemQueryConfig>,
     ) -> Result<WorkshopItemsResult, Error> {
-        let query_config = query_config.unwrap_or_default();
+        let mut query_config = query_config.unwrap_or_default();
         query_config.validate(false)?;
+        if query_config.only_ids == Some(true) {
+            query_config.only_ids = None;
+        }
         let items = items
             .iter()
             .map(published_file_id)
@@ -550,16 +559,19 @@ pub mod workshop {
 
             query_handle = handle_query_config(query_handle, &query_config);
 
-            query_handle.fetch(move |fetch_result| {
-                tx.send(fetch_result.map(|query_results| {
-                    WorkshopItemsResult::from_query_results(query_results, &query_config)
-                }))
-                .unwrap();
+            crate::api::runtime::without_dispatch(|| {
+                query_handle.fetch(move |fetch_result| {
+                    let _ = tx.send(fetch_result.map(|query_results| {
+                        WorkshopItemsResult::from_query_results(query_results, &query_config)
+                    }));
+                });
             });
         }
 
-        rx.await
-            .unwrap()
+        tokio::time::timeout(std::time::Duration::from_secs(30), rx)
+            .await
+            .map_err(|_| Error::from_reason("Timed out waiting for workshop query callback"))?
+            .map_err(|_| Error::from_reason("Workshop query callback dropped"))?
             .map_err(|e| Error::from_reason(e.to_string()))
     }
 
@@ -572,8 +584,11 @@ pub mod workshop {
         consumer_app_id: u32,
         query_config: Option<WorkshopItemQueryConfig>,
     ) -> Result<WorkshopPaginatedResult, Error> {
-        let query_config = query_config.unwrap_or_default();
+        let mut query_config = query_config.unwrap_or_default();
         query_config.validate(false)?;
+        if query_config.only_ids == Some(true) {
+            query_config.only_ids = None;
+        }
         let client = crate::client::get_client();
         let (tx, rx) = oneshot::channel();
 
@@ -593,16 +608,161 @@ pub mod workshop {
 
             query_handle = handle_query_config(query_handle, &query_config);
 
-            query_handle.fetch(move |fetch_result| {
-                tx.send(fetch_result.map(|query_results| {
-                    WorkshopPaginatedResult::from_query_results(query_results, &query_config)
-                }))
-                .unwrap();
+            crate::api::runtime::without_dispatch(|| {
+                query_handle.fetch(move |fetch_result| {
+                    let _ = tx.send(fetch_result.map(|query_results| {
+                        WorkshopPaginatedResult::from_query_results(query_results, &query_config)
+                    }));
+                });
             });
         }
 
-        rx.await
-            .unwrap()
+        tokio::time::timeout(std::time::Duration::from_secs(30), rx)
+            .await
+            .map_err(|_| Error::from_reason("Timed out waiting for workshop query callback"))?
+            .map_err(|_| Error::from_reason("Workshop query callback dropped"))?
+            .map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    #[napi]
+    pub async fn get_all_item_ids(
+        page: u32,
+        query_type: UGCQueryType,
+        item_type: UGCType,
+        creator_app_id: u32,
+        consumer_app_id: u32,
+        query_config: Option<WorkshopItemQueryConfig>,
+    ) -> Result<Vec<BigInt>, Error> {
+        let config = query_config.unwrap_or_default();
+        config.validate(false)?;
+        if config.only_total == Some(true) {
+            return Err(Error::from_reason(
+                "onlyTotal cannot be used when fetching IDs",
+            ));
+        }
+        let client = crate::client::get_client();
+        let (tx, rx) = oneshot::channel();
+        let query = client
+            .ugc()
+            .query_all(
+                query_type.into(),
+                item_type.into(),
+                steamworks::AppIDs::Both {
+                    creator: steamworks::AppId(creator_app_id),
+                    consumer: steamworks::AppId(consumer_app_id),
+                },
+                page,
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let query = handle_query_config(query, &config).set_return_only_ids(true);
+        crate::api::runtime::without_dispatch(|| {
+            query.fetch(move |result| {
+                let _ = tx.send(result.map(|results| {
+                    results
+                        .iter()
+                        .filter_map(|item| item.map(|item| BigInt::from(item.published_file_id.0)))
+                        .collect::<Vec<_>>()
+                }));
+            });
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(30), rx)
+            .await
+            .map_err(|_| Error::from_reason("Timed out waiting for workshop query callback"))?
+            .map_err(|_| Error::from_reason("Workshop query callback dropped"))?
+            .map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    #[napi]
+    pub async fn get_all_item_total(
+        page: u32,
+        query_type: UGCQueryType,
+        item_type: UGCType,
+        creator_app_id: u32,
+        consumer_app_id: u32,
+        query_config: Option<WorkshopItemQueryConfig>,
+    ) -> Result<u32, Error> {
+        let config = query_config.unwrap_or_default();
+        config.validate(false)?;
+        if config.only_ids == Some(true) {
+            return Err(Error::from_reason(
+                "onlyIds cannot be used when fetching a total",
+            ));
+        }
+        let client = crate::client::get_client();
+        let (tx, rx) = oneshot::channel();
+        let query = client
+            .ugc()
+            .query_all(
+                query_type.into(),
+                item_type.into(),
+                steamworks::AppIDs::Both {
+                    creator: steamworks::AppId(creator_app_id),
+                    consumer: steamworks::AppId(consumer_app_id),
+                },
+                page,
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let query = handle_query_config(query, &config).set_return_total_only(true);
+        crate::api::runtime::without_dispatch(|| {
+            query.fetch(move |result| {
+                let _ = tx.send(result.map(|results| results.total_results()));
+            });
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(30), rx)
+            .await
+            .map_err(|_| Error::from_reason("Timed out waiting for workshop query callback"))?
+            .map_err(|_| Error::from_reason("Workshop query callback dropped"))?
+            .map_err(|e| Error::from_reason(e.to_string()))
+    }
+
+    #[napi]
+    pub async fn get_user_item_ids(
+        page: u32,
+        account_id: u32,
+        list_type: UserListType,
+        item_type: UGCType,
+        sort_order: UserListOrder,
+        app_ids: AppIDs,
+        query_config: Option<WorkshopItemQueryConfig>,
+    ) -> Result<Vec<BigInt>, Error> {
+        let config = query_config.unwrap_or_default();
+        config.validate(true)?;
+        if config.only_total == Some(true) {
+            return Err(Error::from_reason(
+                "onlyTotal cannot be used when fetching IDs",
+            ));
+        }
+        let client = crate::client::get_client();
+        let (tx, rx) = oneshot::channel();
+        let query = client
+            .ugc()
+            .query_user(
+                AccountId::from_raw(account_id),
+                list_type.into(),
+                item_type.into(),
+                sort_order.into(),
+                steamworks::AppIDs::Both {
+                    creator: steamworks::AppId(app_ids.creator.unwrap_or(0)),
+                    consumer: steamworks::AppId(app_ids.consumer.unwrap_or(0)),
+                },
+                page,
+            )
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let query = handle_query_config(query, &config).set_return_only_ids(true);
+        crate::api::runtime::without_dispatch(|| {
+            query.fetch(move |result| {
+                let _ = tx.send(result.map(|results| {
+                    results
+                        .iter()
+                        .filter_map(|item| item.map(|item| BigInt::from(item.published_file_id.0)))
+                        .collect::<Vec<_>>()
+                }));
+            });
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(30), rx)
+            .await
+            .map_err(|_| Error::from_reason("Timed out waiting for workshop query callback"))?
+            .map_err(|_| Error::from_reason("Workshop query callback dropped"))?
             .map_err(|e| Error::from_reason(e.to_string()))
     }
 
@@ -616,8 +776,11 @@ pub mod workshop {
         app_ids: AppIDs,
         query_config: Option<WorkshopItemQueryConfig>,
     ) -> Result<WorkshopPaginatedResult, Error> {
-        let query_config = query_config.unwrap_or_default();
+        let mut query_config = query_config.unwrap_or_default();
         query_config.validate(true)?;
+        if query_config.only_ids == Some(true) {
+            query_config.only_ids = None;
+        }
         let client = crate::client::get_client();
         let (tx, rx) = oneshot::channel();
 
@@ -639,16 +802,19 @@ pub mod workshop {
 
             query_handle = handle_query_config(query_handle, &query_config);
 
-            query_handle.fetch(move |fetch_result| {
-                tx.send(fetch_result.map(|query_results| {
-                    WorkshopPaginatedResult::from_query_results(query_results, &query_config)
-                }))
-                .unwrap();
+            crate::api::runtime::without_dispatch(|| {
+                query_handle.fetch(move |fetch_result| {
+                    let _ = tx.send(fetch_result.map(|query_results| {
+                        WorkshopPaginatedResult::from_query_results(query_results, &query_config)
+                    }));
+                });
             });
         }
 
-        rx.await
-            .unwrap()
+        tokio::time::timeout(std::time::Duration::from_secs(30), rx)
+            .await
+            .map_err(|_| Error::from_reason("Timed out waiting for workshop query callback"))?
+            .map_err(|_| Error::from_reason("Workshop query callback dropped"))?
             .map_err(|e| Error::from_reason(e.to_string()))
     }
 }

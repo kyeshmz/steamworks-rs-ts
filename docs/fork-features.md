@@ -24,7 +24,7 @@ Register `SteamInputDeviceConnected` and `SteamInputDeviceDisconnected` before c
 
 ## What the checks prove
 
-`test/package-smoke.js` loads the built addon and checks native argument validation without a Steam account. `test/typescript` compiles a consumer against the declarations. `node test/networking-sockets.js` tests invalid socket handles, message sizes, ports and peer IDs without opening a connection. The release workflow is configured for Linux x64, Windows x64, and both Mac architectures. GitHub Actions is disabled on this repository.
+`test/package-smoke.js` loads the built addon and checks native argument validation without a Steam account. `test/typescript` compiles a consumer against the declarations. `node test/networking-sockets.js` tests invalid socket handles, message sizes, ports and peer IDs without opening a connection. See the [public CI results](https://github.com/kyeshmz/steamworks-rs-ts/actions/workflows/publish.yml) and [platform matrix](../README.md#ci-coverage) for packed-artifact coverage on Windows, macOS and Linux.
 
 Use `node test/steam-readonly.js 480` with a signed-in Steam client to check reads. `test/inventory-definitions.js` needs an App ID and a known item definition. Overlay rendering, physical input, two-account networking and writes to Steam need separate live tests.
 

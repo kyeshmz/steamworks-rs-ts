@@ -1,8 +1,50 @@
 /// <reference types="node" />
 
+export interface AchievementIconFetched {
+  game_id: bigint
+  achievement_name: string
+  achieved: boolean
+  icon_handle: number
+}
+
+export interface AchievementStored {
+  game_id: bigint
+  achievement_name: string
+  current_progress: number
+  max_progress: number
+}
+
+export interface DeleteItemResult {
+  published_file_id: bigint
+  error: any
+}
+
+export interface DownloadItemResult {
+  app_id: number
+  published_file_id: bigint
+  error: any
+}
+
+export interface GlobalStatsReceived {
+  game_id: bigint
+  error: any
+}
+
 export declare function init(appId?: number | undefined | null): void
 
 export declare function isInitialized(): boolean
+
+export interface LobbyCreated {
+  result: number
+  lobby: bigint
+}
+
+export interface LobbyEnter {
+  lobby: bigint
+  chat_permissions: number
+  blocked: boolean
+  chat_room_enter_response: string
+}
 
 export interface PlayerSteamId {
   steamId64: bigint
@@ -10,9 +52,32 @@ export interface PlayerSteamId {
   accountId: number
 }
 
+export interface RelayNetworkStatus {
+  availability: number
+  ping_measurement_in_progress: boolean
+  network_config: number
+  any_relay: number
+  debug_message: string
+}
+
+export interface RemotePlay {
+  session: number
+}
+
 export declare function restartAppIfNecessary(appId: number): boolean
 
 export declare function runCallbacks(): void
+
+export interface StatsReceived {
+  steam_id: bigint
+  game_id: bigint
+  error: any
+}
+
+export interface StatsStored {
+  game_id: bigint
+  error: any
+}
 
 export interface TicketValidation {
   steam_id: bigint
@@ -21,12 +86,23 @@ export interface TicketValidation {
 }
 
 export declare namespace achievement {
+  export interface AchievementIcon {
+    width: number
+    height: number
+    rgba: Buffer
+  }
+  export interface AchievementUnlockTime {
+    achieved: boolean
+    unlockTime: number
+  }
   export function activate(achievement: string): boolean
   export function clear(achievement: string): boolean
   export function count(): number
   export function getAchievedPercent(achievement: string): number | null
+  export function getAchievementAndUnlockTime(achievement: string): achievement.AchievementUnlockTime | null
   export function getDisplayAttribute(achievement: string, key: string): string | null
   export function getIcon(achievement: string): Buffer | null
+  export function getIconRgba(achievement: string): achievement.AchievementIcon | null
   export function isActivated(achievement: string): boolean
   export function names(): Array<string>
   export function requestGlobalPercentages(): Promise<void>
@@ -82,6 +158,7 @@ export declare namespace callback {
     disconnect(): void
   }
   export function register<C extends keyof import('./callbacks').CallbackReturns>(steamCallback: C, handler: (value: import('./callbacks').CallbackReturns[C]) => void): callback.Handle
+  export function registerTyped<C extends keyof import('./callbacks').RuntimeCallbackReturns>(steamCallback: C, handler: (value: import('./callbacks').RuntimeCallbackReturns[C]) => void): callback.Handle
   export const enum SteamCallback {
     PersonaStateChange = 0,
     SteamServersConnected = 1,
@@ -104,6 +181,19 @@ export declare namespace callback {
     SteamInputDeviceDisconnected = 18,
     SteamInventoryDefinitionUpdate = 19,
     SteamInventoryFullUpdate = 20,
+    LobbyCreated = 21,
+    LobbyEnter = 22,
+    NewUrlLaunchParameters = 23,
+    UserStatsReceived = 24,
+    UserStatsStored = 25,
+    UserAchievementStored = 26,
+    UserAchievementIconFetched = 27,
+    DownloadItemResult = 28,
+    RemotePlayConnected = 29,
+    RemotePlayDisconnected = 30,
+    RelayNetworkStatus = 31,
+    GlobalStatsReceived = 32,
+    DeleteItemResult = 33,
   }
 }
 
@@ -122,6 +212,7 @@ export declare namespace cloud {
   export function endFileWriteBatch(): boolean
   export function fileExists(name: string): boolean
   export function fileTimestamp(name: string): number
+  export function forgetFile(name: string): boolean
   export function getQuota(): cloud.CloudQuota | null
   export function getSyncPlatforms(name: string): number
   export function isEnabledForAccount(): boolean
@@ -132,6 +223,7 @@ export declare namespace cloud {
   export function readFileBytes(name: string): Promise<Buffer>
   export function setEnabledForApp(enabled: boolean): void
   export function setSyncPlatforms(name: string, mask: number): boolean
+  export function shareFile(name: string): Promise<bigint>
   export function writeFile(name: string, content: string): boolean
   export function writeFileBytes(name: string, data: Buffer): Promise<void>
 }
@@ -174,10 +266,12 @@ export declare namespace friends {
   export function getFriendsGroupMembersList(groupId: number): Array<bigint>
   export function getFriendsGroups(): Array<friends.FriendsGroup>
   export function getGamePlayed(steamId64: bigint): friends.FriendGameInfo | null
+  export function getNickname(steamId64: bigint): string | null
   export function getPersona(steamId64: bigint): friends.Persona
   export function getPersonaName(steamId64: bigint): string
   export function getRichPresence(steamId64: bigint, key: string): string
   export function getRichPresenceKeys(steamId64: bigint): Array<string>
+  export function hasFriend(steamId64: bigint, filter?: friends.FriendFilter | undefined | null): boolean
   export function inviteUserToGame(steamId64: bigint, connect: string): boolean
   export interface Persona {
     name: string
@@ -193,7 +287,15 @@ export declare namespace game_server {
   export class AuthListener {
     disconnect(): void
   }
+  export function acceptHostedConnection(connection: bigint): void
+  export function acceptMessageSession(id: bigint): boolean
+  export function acceptP2pSession(id: bigint): boolean
   export function beginAuthSession(steamId64: bigint, ticket: Buffer): void
+  export function clearAllKeyValues(): void
+  export function closeHostedConnection(connection: bigint): boolean
+  export function closeHostedListenSocket(): boolean
+  export function closeMessageSession(id: bigint): boolean
+  export function closeP2pSession(id: bigint): boolean
   export const enum ConnectionState {
     Ready = 'Ready',
     Connecting = 'Connecting',
@@ -201,21 +303,85 @@ export declare namespace game_server {
     Failed = 'Failed',
     Disconnected = 'Disconnected',
   }
+  export function diagnostics(): game_server.ServerDiagnostics
   export function endAuthSession(steamId64: bigint): void
+  export function getNextOutgoingPacket(): game_server.OutgoingPacket | null
+  export function handleIncomingPacket(data: Buffer, address: string, port: number): boolean
+  export interface HostedEvent {
+    connection: bigint
+    state: number
+    steamId?: bigint
+    endReason: number
+  }
+  export interface HostedEvents {
+    events: Array<game_server.HostedEvent>
+    dropped: number
+  }
   export function init(options: game_server.ServerOptions): void
   export function logOn(token: string): void
   export function logOnAnonymous(): void
+  export interface MessageSessionRequest {
+    steamId?: bigint
+  }
   export const enum Mode {
     NoAuthentication = 'NoAuthentication',
     Authentication = 'Authentication',
     AuthenticationAndSecure = 'AuthenticationAndSecure',
   }
+  export function onMessageSessionRequest(handler: (arg: game_server.MessageSessionRequest) => void): AuthListener
+  export function onP2pSessionRequest(handler: (arg: game_server.P2PSessionRequest) => void): AuthListener
+  export function onServerEvent(handler: (event: { kind: 'approve'; user: bigint; owner: bigint } | { kind: 'deny'; user: bigint; reason: number; text: string } | { kind: 'kick'; user: bigint; reason: number } | { kind: 'group'; user: bigint; group: bigint; member: boolean; officer: boolean }) => void): game_server.AuthListener
   export function onValidateAuthTicketResponse(handler: (event: { steam_id: bigint; owner_steam_id: bigint; response: number }) => void): game_server.AuthListener
+  export function openHostedListenSocket(virtualPort: number): void
+  export interface OutgoingPacket {
+    address: string
+    port: number
+    data: Buffer
+  }
+  export interface P2PSessionRequest {
+    steamId: bigint
+  }
+  export function p2pSessionState(id: bigint): game_server.P2PState | null
+  export interface P2PState {
+    connectionActive: boolean
+    connecting: boolean
+    error: number
+    usingRelay: boolean
+    bytesQueuedForSend: number
+    packetsQueuedForSend: number
+    remoteIp?: string
+    remotePort?: number
+  }
+  export function receiveHostedMessages(connection: bigint, maxMessages: number): Array<game_server.ServerMessage>
+  export function receiveMessages(channel: number, maxMessages: number): Array<game_server.ServerMessage>
+  export function requestUserGroupStatus(user: bigint, group: bigint): boolean
   export function runCallbacks(): void
+  export function sendHostedMessage(connection: bigint, data: Buffer, reliable: boolean): bigint
+  export function sendMessageToUser(id: bigint, data: Buffer, channel: number, reliable: boolean): void
+  export interface ServerDiagnostics {
+    appId: number
+    serverRealTime: number
+  }
+  export interface ServerEvent {
+    kind: string
+    user: bigint
+    owner?: bigint
+    group?: bigint
+    reason?: number
+    text?: string
+    member?: boolean
+    officer?: boolean
+  }
   export interface ServerListing {
     serverName: string
     mapName: string
     maxPlayers: number
+    botPlayers?: number
+    passwordProtected?: boolean
+  }
+  export interface ServerMessage {
+    data: Buffer
+    steamId?: bigint
   }
   export interface ServerOptions {
     bindIp: string
@@ -232,8 +398,13 @@ export declare namespace game_server {
     steamId?: bigint
   }
   export function setAdvertising(active: boolean): void
+  export function setGameData(data: string): void
+  export function setGameTags(tags: string): void
+  export function setKeyValue(key: string, value: string): void
+  export function setModDir(directory: string): void
   export function shutdown(): boolean
   export function status(): game_server.ServerStatus
+  export function takeHostedEvents(maxEvents: number): game_server.HostedEvents
   export function updateListing(listing: game_server.ServerListing): void
 }
 
@@ -241,6 +412,8 @@ export declare namespace input {
   export class Controller {
     activateActionSet(actionSetHandle: bigint): void
     isDigitalActionPressed(actionHandle: bigint): boolean
+    getDigitalActionData(action: bigint): DigitalActionData
+    getAnalogActionData(action: bigint): AnalogActionData
     getAnalogActionVector(actionHandle: bigint): AnalogActionVector
     getType(): input.InputType
     getHandle(): bigint
@@ -257,9 +430,19 @@ export declare namespace input {
     triggerVibration(leftSpeed: number, rightSpeed: number): void
     triggerSimpleHapticEvent(location: input.HapticLocation, intensity: number, gainDb: number, otherIntensity: number, otherGainDb: number): void
   }
+  export interface AnalogActionData {
+    x: number
+    y: number
+    mode: number
+    active: boolean
+  }
   export interface AnalogActionVector {
     x: number
     y: number
+  }
+  export interface DigitalActionData {
+    pressed: boolean
+    active: boolean
   }
   export function enableDeviceCallbacks(): void
   export function getActionSet(actionSetName: string): bigint
@@ -410,8 +593,20 @@ export declare namespace localplayer {
   export function getLevel(): number
   export function getName(): string
   export function getSteamId(): PlayerSteamId
+  export function getSteamIdDetails(steamId: bigint): localplayer.SteamIdDetails
   export function isLoggedOn(): boolean
   export function setRichPresence(key: string, value?: string | undefined | null): void
+  export interface SteamIdDetails {
+    universe: number
+    accountType: number
+    isInvalid: boolean
+  }
+  export const enum UserHasLicense {
+    HasLicense = 0,
+    DoesNotHaveLicense = 1,
+    NoAuth = 2,
+  }
+  export function userHasLicenseForApp(steamId: bigint, appId: number): localplayer.UserHasLicense
 }
 
 export declare namespace matchmaking {
@@ -431,6 +626,8 @@ export declare namespace matchmaking {
     inviteUser(steamId64: bigint): boolean
     getMembers(): Array<PlayerSteamId>
     getOwner(): PlayerSteamId
+    setGameServer(ip: string, port: number, steamId?: bigint | undefined | null): void
+    getGameServer(): matchmaking.LobbyGameServer | null
     setMemberData(key: string, value: string): void
     getMemberData(steamId64: bigint, key: string): string | null
     setJoinable(joinable: boolean): boolean
@@ -456,6 +653,11 @@ export declare namespace matchmaking {
     Default = 1,
     Far = 2,
     Worldwide = 3,
+  }
+  export interface LobbyGameServer {
+    ip: string
+    port: number
+    steamId?: bigint
   }
   export interface LobbyListFilter {
     stringFilters?: Array<matchmaking.LobbyStringFilter>
@@ -487,15 +689,63 @@ export declare namespace matchmaking {
   }
 }
 
+export declare namespace matchmaking_servers {
+  export class ServerList {
+    isRefreshing(): boolean
+    count(): number
+    getServer(index: number): matchmaking_servers.ServerInfo | null
+    cancel(): boolean
+    release(): boolean
+  }
+  export function requestList(appId: number, kind: 'internet' | 'lan' | 'friends' | 'favorites' | 'history' | 'spectator', filters?: Array<matchmaking_servers.ServerFilter> | undefined | null): matchmaking_servers.ServerList
+  export interface ServerFilter {
+    key: string
+    value: string
+  }
+  export interface ServerInfo {
+    appId: number
+    steamId: bigint
+    address: string
+    queryPort: number
+    connectionPort: number
+    pingMs: number
+    players: number
+    maxPlayers: number
+    botPlayers: number
+    version: number
+    lastTimePlayed: number
+    successfulResponse: boolean
+    doNotRefresh: boolean
+    password: boolean
+    secure: boolean
+    name: string
+    map: string
+    gameDir: string
+    description: string
+    tags: string
+  }
+}
+
 export declare namespace networking {
   export function acceptP2PSession(steamId64: bigint): void
   export function closeP2PSession(steamId64: bigint): void
+  export function getP2PSessionState(steamId64: bigint): networking.P2PSessionState | null
   export function isP2PPacketAvailable(): number
   export function isP2PPacketAvailableOnChannel(channel: number): number
   export interface P2PPacket {
     data: Buffer
     size: number
     steamId: PlayerSteamId
+  }
+  export interface P2PSessionState {
+    connectionActive: boolean
+    connecting: boolean
+    error: number
+    usingRelay: boolean
+    bytesQueuedForSend: number
+    packetsQueuedForSend: number
+    remoteIp?: string
+    remotePort?: number
   }
   export function readP2PPacket(size: number): networking.P2PPacket
   export function readP2PPacketFromChannel(size: number, channel: number): networking.P2PPacket
@@ -507,12 +757,15 @@ export declare namespace networking {
     Reliable = 2,
     ReliableWithBuffering = 3,
   }
+  export function tryAcceptP2PSession(steamId64: bigint): boolean
+  export function tryCloseP2PSession(steamId64: bigint): boolean
 }
 
 export declare namespace networking_messages {
   export function acceptSessionWithUser(steamId64: bigint): boolean
   export function closeChannelWithUser(steamId64: bigint, channel: number): boolean
   export function closeSessionWithUser(steamId64: bigint): boolean
+  export function getSessionConnectionInfo(steamId64: bigint): networking_messages.SessionConnectionInfo | null
   export interface Message {
     data: Buffer
     steamId?: PlayerSteamId
@@ -525,6 +778,15 @@ export declare namespace networking_messages {
   }
   export function receiveMessagesOnChannel(channel?: number | undefined | null, maxMessages?: number | undefined | null): Array<networking_messages.Message>
   export function sendMessageToUser(steamId64: bigint, data: Buffer, channel?: number | undefined | null, sendType?: networking_messages.MessageSendType | undefined | null): void
+  export interface SessionConnectionInfo {
+    state: number
+    steamId64?: bigint
+    listenSocket: number
+    endReason: number
+    ping: number
+    qualityLocal: number
+    qualityRemote: number
+  }
   export interface SessionFailure {
     steamId?: PlayerSteamId
   }
@@ -537,8 +799,14 @@ export declare namespace networking_messages {
 
 export declare namespace networking_sockets {
   export function acceptConnection(connection: number): void
+  export function authenticationStatus(): networking_sockets.AuthenticationStatus
+  export interface AuthenticationStatus {
+    availability: number
+    debugMessage: string
+  }
   export function closeConnection(connection: number, linger?: boolean | undefined | null): boolean
   export function closeListenSocket(socket: number): boolean
+  export function configureConnectionLanes(connection: number, lanes: Array<networking_sockets.LaneConfig>): void
   export function connectByIpAddress(address: string, port: number): number
   export function connectionInfo(connection: number): networking_sockets.ConnectionInfo | null
   export interface ConnectionInfo {
@@ -548,28 +816,81 @@ export declare namespace networking_sockets {
     state: number
     endReason: number
   }
+  export function connectionName(connection: number): string | null
+  export function connectionUserData(connection: number): bigint | null
   export function connectP2P(steamId64: bigint, virtualPort: number): number
   export function createListenSocketIp(port: number, address?: string | undefined | null): number
   export function createListenSocketP2P(virtualPort: number): number
   export function createPollGroup(): number
   export function destroyPollGroup(group: number): boolean
+  export function detailedRelayNetworkStatus(): networking_sockets.RelayNetworkStatus
+  export function flushMessages(connection: number): void
+  export function initAuthentication(): number
   export function initRelayNetworkAccess(): void
+  export interface LaneConfig {
+    priority: number
+    weight: number
+  }
+  export interface LaneStatus {
+    pendingUnreliable: number
+    pendingReliable: number
+    sentUnackedReliable: number
+    queueTimeMicroseconds: bigint
+  }
+  export interface OutgoingMessage {
+    connection: number
+    data: Buffer
+    reliable?: boolean
+    lane?: number
+  }
   export interface PollGroupMessage {
     connection: number
     data: Buffer
   }
+  export function realtimeConnectionStatus(connection: number, lanes?: number | undefined | null): networking_sockets.RealtimeStatus
+  export interface RealtimeStatus {
+    state: number
+    ping: number
+    qualityLocal: number
+    qualityRemote: number
+    outPacketsPerSecond: number
+    outBytesPerSecond: number
+    inPacketsPerSecond: number
+    inBytesPerSecond: number
+    sendRateBytesPerSecond: number
+    pendingUnreliable: number
+    pendingReliable: number
+    sentUnackedReliable: number
+    queueTimeMicroseconds: bigint
+    lanes: Array<networking_sockets.LaneStatus>
+  }
   export function receiveMessages(connection: number, maxMessages?: number | undefined | null): Array<Buffer>
   export function receiveMessagesOnPollGroup(group: number, maxMessages?: number | undefined | null): Array<networking_sockets.PollGroupMessage>
+  export interface RelayNetworkStatus {
+    availability: string
+    pingMeasurementInProgress: boolean
+    networkConfig: string
+    anyRelay: string
+    debugMessage: string
+  }
   export function relayStatus(): string
   export function sendMessage(connection: number, data: Buffer, reliable?: boolean | undefined | null): bigint
+  export interface SendMessageResult {
+    messageNumber?: bigint
+    error?: bigint
+  }
+  export function sendMessages(messages: Array<networking_sockets.OutgoingMessage>): Array<networking_sockets.SendMessageResult>
+  export function setConnectionName(connection: number, name: string): void
   export function setConnectionPollGroup(connection: number, group: number): boolean
   export function setConnectionStatusHandler(handler?: (info: ConnectionInfo) => void): void
+  export function setConnectionUserData(connection: number, value: bigint): boolean
 }
 
 export declare namespace overlay {
   export function activateDialog(dialog: overlay.Dialog): void
   export function activateDialogToUser(dialog: overlay.Dialog, steamId64: bigint): void
   export function activateInviteDialog(lobbyId: bigint): void
+  export function activateInviteDialogConnectString(connect: string): void
   export function activateToStore(appId: number, flag: overlay.StoreFlag): void
   export function activateToWebPage(url: string): void
   export const enum Dialog {
@@ -593,6 +914,23 @@ export declare namespace overlay {
     AddToCart = 1,
     AddToCartAndShow = 2,
   }
+}
+
+export declare namespace remote_play {
+  export function invite(friend: bigint): boolean
+  export interface RemotePlayResolution {
+    width: number
+    height: number
+  }
+  export interface RemotePlaySession {
+    id: number
+    user: bigint
+    clientName: string
+    clientFormFactor?: string
+    clientResolution?: remote_play.RemotePlayResolution
+  }
+  export function session(id: number): remote_play.RemotePlaySession | null
+  export function sessions(): Array<number>
 }
 
 export declare namespace runtime {
@@ -620,11 +958,38 @@ export declare namespace screenshots {
 
 export declare namespace stats {
   export function getFloat(name: string): number | null
+  export function getGlobalFloat(name: string): number | null
+  export function getGlobalFloatHistory(name: string, maxDays: number): Array<number> | null
+  export function getGlobalInt(name: string): bigint | null
+  export function getGlobalIntHistory(name: string, maxDays: number): Array<bigint> | null
   export function getInt(name: string): number | null
+  export function getUserAchievement(steamId: bigint, name: string): boolean | null
+  export function getUserStatFloat(steamId: bigint, name: string): number | null
+  export function getUserStatInt(steamId: bigint, name: string): number | null
+  export function requestGlobalStats(historyDays: number): Promise<bigint>
+  export function requestUserStats(steamId: bigint): void
   export function resetAll(achievementsToo: boolean): boolean
   export function setFloat(name: string, value: number): boolean
   export function setInt(name: string, value: number): boolean
   export function store(): boolean
+}
+
+export declare namespace timeline {
+  export function addTimelineEvent(icon: string, title: string, description: string, priority: number, startOffsetSeconds: number, durationSeconds: number, clipPriority: timeline.ClipPriority): void
+  export function clearTimelineStateDescription(seconds: number): void
+  export const enum ClipPriority {
+    None = 0,
+    Standard = 1,
+    Featured = 2,
+  }
+  export const enum GameMode {
+    Playing = 0,
+    Staging = 1,
+    Menus = 2,
+    LoadingScreen = 3,
+  }
+  export function setTimelineGameMode(mode: timeline.GameMode): void
+  export function setTimelineStateDescription(description: string, seconds: number): void
 }
 
 export declare namespace utils {
@@ -647,8 +1012,13 @@ export declare namespace utils {
   export function isOverlayEnabled(): boolean
   export function isSteamInBigPictureMode(): boolean
   export function isSteamRunningOnSteamDeck(): boolean
+  export function setWarningHandler(handler?: (warning: SteamWarning) => void): void
   export function showFloatingGamepadTextInput(keyboardMode: utils.FloatingGamepadTextInputMode, x: number, y: number, width: number, height: number): Promise<boolean>
   export function showGamepadTextInput(inputMode: utils.GamepadTextInputMode, inputLineMode: utils.GamepadTextInputLineMode, description: string, maxCharacters: number, existingText?: string | undefined | null): Promise<string | null>
+  export interface SteamWarning {
+    severity: number
+    message: string
+  }
   export function uiLanguage(): string
 }
 
@@ -699,10 +1069,13 @@ export declare namespace workshop {
     SteamVideo = 14,
     GameManagedItem = 15,
   }
+  export function getAllItemIds(page: number, queryType: workshop.UGCQueryType, itemType: workshop.UGCType, creatorAppId: number, consumerAppId: number, queryConfig?: workshop.WorkshopItemQueryConfig | undefined | null): Promise<Array<bigint>>
   export function getAllItems(page: number, queryType: workshop.UGCQueryType, itemType: workshop.UGCType, creatorAppId: number, consumerAppId: number, queryConfig?: workshop.WorkshopItemQueryConfig | undefined | null): Promise<workshop.WorkshopPaginatedResult>
+  export function getAllItemTotal(page: number, queryType: workshop.UGCQueryType, itemType: workshop.UGCType, creatorAppId: number, consumerAppId: number, queryConfig?: workshop.WorkshopItemQueryConfig | undefined | null): Promise<number>
   export function getItem(item: bigint, queryConfig?: workshop.WorkshopItemQueryConfig | undefined | null): Promise<workshop.WorkshopItem | null>
   export function getItems(items: Array<bigint>, queryConfig?: workshop.WorkshopItemQueryConfig | undefined | null): Promise<workshop.WorkshopItemsResult>
-  export function getSubscribedItems(): Array<bigint>
+  export function getSubscribedItems(includeLocallyDisabled?: boolean | undefined | null): Array<bigint>
+  export function getUserItemIds(page: number, accountId: number, listType: workshop.UserListType, itemType: workshop.UGCType, sortOrder: workshop.UserListOrder, appIds: workshop.AppIDs, queryConfig?: workshop.WorkshopItemQueryConfig | undefined | null): Promise<Array<bigint>>
   export function getUserItems(page: number, accountId: number, listType: workshop.UserListType, itemType: workshop.UGCType, sortOrder: workshop.UserListOrder, appIds: workshop.AppIDs, queryConfig?: workshop.WorkshopItemQueryConfig | undefined | null): Promise<workshop.WorkshopPaginatedResult>
   export function installInfo(itemId: bigint): workshop.InstallInfo | null
   export interface InstallInfo {
@@ -714,8 +1087,12 @@ export declare namespace workshop {
     key: string
     value: string
   }
+  export function startPlaytimeTracking(itemIds: Array<bigint>): Promise<void>
   export function state(itemId: bigint): number
+  export function stopPlaytimeTracking(itemIds: Array<bigint>): Promise<void>
+  export function stopPlaytimeTrackingForAllItems(): Promise<void>
   export function subscribe(itemId: bigint): Promise<void>
+  export function suspendDownloads(suspend: boolean): void
   export const enum UgcItemVisibility {
     Public = 0,
     FriendsOnly = 1,
@@ -767,6 +1144,7 @@ export declare namespace workshop {
   export interface UgcUpdate {
     title?: string
     description?: string
+    language?: string
     changeNote?: string
     previewPath?: string
     contentPath?: string

@@ -17,6 +17,41 @@ pub mod networking {
         pub steam_id: PlayerSteamId,
     }
 
+    #[napi(object)]
+    pub struct P2PSessionState {
+        pub connection_active: bool,
+        pub connecting: bool,
+        pub error: u32,
+        pub using_relay: bool,
+        pub bytes_queued_for_send: i32,
+        pub packets_queued_for_send: i32,
+        pub remote_ip: Option<String>,
+        pub remote_port: Option<u32>,
+    }
+
+    #[napi(strict)]
+    pub fn get_p2p_session_state(steam_id64: BigInt) -> Result<Option<P2PSessionState>, Error> {
+        let id = peer(steam_id64)?;
+        let mut state: sys::P2PSessionState_t = unsafe { std::mem::zeroed() };
+        if !unsafe {
+            sys::SteamAPI_ISteamNetworking_GetP2PSessionState(interface()?, id, &mut state)
+        } {
+            return Ok(None);
+        }
+        let ip = state.m_nRemoteIP;
+        let port = state.m_nRemotePort;
+        Ok(Some(P2PSessionState {
+            connection_active: state.m_bConnectionActive != 0,
+            connecting: state.m_bConnecting != 0,
+            error: state.m_eP2PSessionError as u32,
+            using_relay: state.m_bUsingRelay != 0,
+            bytes_queued_for_send: state.m_nBytesQueuedForSend,
+            packets_queued_for_send: state.m_nPacketsQueuedForSend,
+            remote_ip: (ip != 0).then(|| std::net::Ipv4Addr::from(ip).to_string()),
+            remote_port: (port != 0).then_some(port as u32),
+        }))
+    }
+
     #[napi]
     pub enum SendType {
         Unreliable,
@@ -39,10 +74,11 @@ pub mod networking {
     }
 
     fn peer(id: BigInt) -> Result<u64, Error> {
-        let (_, raw, lossless) = id.get_u64();
+        let (negative, raw, lossless) = id.get_u64();
         let account_type = (raw >> 52) & 0xf;
         let instance = (raw >> 32) & 0xfffff;
-        if lossless
+        if !negative
+            && lossless
             && (1..=4).contains(&(raw >> 56))
             && raw as u32 != 0
             && ((account_type == 1 && instance == 1) || matches!(account_type, 3 | 4))
@@ -167,15 +203,25 @@ pub mod networking {
 
     #[napi(strict)]
     pub fn accept_p2p_session(steam_id64: BigInt) -> Result<(), Error> {
-        let peer = peer(steam_id64)?;
-        unsafe { sys::SteamAPI_ISteamNetworking_AcceptP2PSessionWithUser(interface()?, peer) };
+        try_accept_p2p_session(steam_id64)?;
         Ok(())
     }
 
     #[napi(strict)]
-    pub fn close_p2p_session(steam_id64: BigInt) -> Result<(), Error> {
+    pub fn try_accept_p2p_session(steam_id64: BigInt) -> Result<bool, Error> {
         let peer = peer(steam_id64)?;
-        unsafe { sys::SteamAPI_ISteamNetworking_CloseP2PSessionWithUser(interface()?, peer) };
+        Ok(unsafe { sys::SteamAPI_ISteamNetworking_AcceptP2PSessionWithUser(interface()?, peer) })
+    }
+
+    #[napi(strict)]
+    pub fn close_p2p_session(steam_id64: BigInt) -> Result<(), Error> {
+        try_close_p2p_session(steam_id64)?;
         Ok(())
+    }
+
+    #[napi(strict)]
+    pub fn try_close_p2p_session(steam_id64: BigInt) -> Result<bool, Error> {
+        let peer = peer(steam_id64)?;
+        Ok(unsafe { sys::SteamAPI_ISteamNetworking_CloseP2PSessionWithUser(interface()?, peer) })
     }
 }

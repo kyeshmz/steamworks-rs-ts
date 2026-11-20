@@ -36,7 +36,6 @@ pub fn init(app_id: Option<u32>) -> Result<()> {
             | SteamAPIInitError::NoSteamClient(msg)
             | SteamAPIInitError::VersionMismatch(msg) => Error::from_reason(msg),
         })?;
-    client.user_stats().request_current_stats();
     *slot = Some(client);
     Ok(())
 }

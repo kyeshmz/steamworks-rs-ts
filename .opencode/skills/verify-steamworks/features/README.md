@@ -2,3 +2,4 @@
 - [Read-only Steam client calls](client.md)
 - [Inventory results and P2P sockets](inventory-sockets.md)
 - [Dedicated server lifecycle](server.md)
+- [0.13 SDK integration and fixture commands](../../../../docs/steamworks-0.13.md#reproduce-the-checks)

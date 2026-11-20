@@ -9,20 +9,6 @@ pub mod cloud {
     use std::io::Write;
     use steamworks::sys;
 
-    extern "C" {
-        #[link_name = "SteamAPI_ISteamRemoteStorage_GetSyncPlatforms"]
-        fn get_platform_mask(
-            storage: *mut sys::ISteamRemoteStorage,
-            name: *const std::ffi::c_char,
-        ) -> u32;
-        #[link_name = "SteamAPI_ISteamRemoteStorage_SetSyncPlatforms"]
-        fn set_platform_mask(
-            storage: *mut sys::ISteamRemoteStorage,
-            name: *const std::ffi::c_char,
-            mask: u32,
-        ) -> bool;
-    }
-
     fn with_storage<T>(f: impl FnOnce(*mut sys::ISteamRemoteStorage) -> T) -> Result<T, Error> {
         let _client = crate::client::get_client();
         let storage = unsafe { sys::SteamAPI_SteamRemoteStorage_v016() };
@@ -36,7 +22,9 @@ pub mod cloud {
     pub fn get_sync_platforms(name: String) -> Result<u32, Error> {
         check_name(&name)?;
         let name = CString::new(name).map_err(|e| Error::from_reason(e.to_string()))?;
-        with_storage(|storage| unsafe { get_platform_mask(storage, name.as_ptr()) })
+        with_storage(|storage| unsafe {
+            sys::SteamAPI_ISteamRemoteStorage_GetSyncPlatforms(storage, name.as_ptr()).0 as u32
+        })
     }
 
     #[napi]
@@ -46,7 +34,31 @@ pub mod cloud {
             return Err(Error::from_reason("Invalid cloud platform mask"));
         }
         let name = CString::new(name).map_err(|e| Error::from_reason(e.to_string()))?;
-        with_storage(|storage| unsafe { set_platform_mask(storage, name.as_ptr(), mask as u32) })
+        with_storage(|storage| unsafe {
+            sys::SteamAPI_ISteamRemoteStorage_SetSyncPlatforms(
+                storage,
+                name.as_ptr(),
+                sys::ERemoteStoragePlatform(mask as u32 as _),
+            )
+        })
+    }
+
+    #[napi]
+    pub async fn share_file(name: String) -> Result<BigInt, Error> {
+        check_name(&name)?;
+        let client = crate::client::get_client();
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        crate::api::runtime::without_dispatch(|| {
+            client.remote_storage().file(&name).share(move |result| {
+                let _ = tx.send(result);
+            });
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(30), rx)
+            .await
+            .map_err(|_| Error::from_reason("Timed out waiting for cloud share callback"))?
+            .map_err(|_| Error::from_reason("Cloud share callback dropped"))?
+            .map(BigInt::from)
+            .map_err(|e| Error::from_reason(e.to_string()))
     }
 
     #[napi(object)]
@@ -151,6 +163,15 @@ pub mod cloud {
         let file = client.remote_storage().file(&name);
 
         file.delete()
+    }
+
+    #[napi]
+    pub fn forget_file(name: String) -> Result<bool, Error> {
+        check_name(&name)?;
+        Ok(crate::client::get_client()
+            .remote_storage()
+            .file(&name)
+            .forget())
     }
 
     #[napi]

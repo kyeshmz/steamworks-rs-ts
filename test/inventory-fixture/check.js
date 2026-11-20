@@ -30,7 +30,41 @@ async function run() {
     Atomics.notify(gate, 0)
     await initialized
     assert.equal(steam.isInitialized(), true)
-    const { inventory, auth, callback, cloud, voice, runtime, friends } = steam.init()
+    const { inventory, auth, callback, cloud, voice, runtime, friends, utils, input: steamInput } = steam.init()
+    const controllers = steamInput.getControllers()
+    assert.equal(controllers.length, 1)
+    assert.equal(controllers[0].getHandle(), (1n << 64n) - 8n)
+    assert.deepEqual(controllers[0].getDigitalActionData(11n), { active: true, pressed: false })
+    assert.deepEqual(controllers[0].getAnalogActionData(22n), { active: true, mode: 6, x: -0.5, y: 0.25 })
+    assert.equal(steamInput.getStringForActionOrigin(494), 'SDK 1.64 origin')
+    assert.throws(() => steamInput.getStringForActionOrigin(495), /action origin/)
+    const input = prompt => utils.showGamepadTextInput(utils.GamepadTextInputMode.Normal, utils.GamepadTextInputLineMode.SingleLine, prompt, 20)
+    const floating = width => utils.showFloatingGamepadTextInput(utils.FloatingGamepadTextInputMode.SingleLine, 2, 3, width, 100)
+    const timedOut = setTimeout(() => { throw Error('Steam keyboard dismissal did not settle') }, 5000)
+    assert.equal(await input('unavailable'), null)
+    assert.equal(await input('cancel'), null)
+    assert.equal(await input('submit'), 'Caf!')
+    const dialogs = [input('held'), input('held')]
+    assert.equal(await Promise.race(dialogs), null)
+    steamInput.getStringForActionOrigin(493)
+    assert.deepEqual((await Promise.all(dialogs)).sort(), ['Caf!', null])
+    assert.equal(await floating(0), false)
+    assert.equal(await floating(80), true)
+    clearTimeout(timedOut)
+    const fixturePeer = 76561197960265729n
+    assert.equal(friends.getNickname(fixturePeer), 'Player Two')
+    assert.equal(friends.getNickname(fixturePeer + 1n), null)
+    assert.equal(friends.hasFriend(fixturePeer, friends.FriendFilter.Blocked), false)
+    await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(Error('missing SDK warning')), 3000)
+        utils.setWarningHandler(warning => {
+            clearTimeout(timer)
+            try { assert.deepEqual(warning, { severity: 1, message: 'fixture warning' }); resolve() }
+            catch (e) { reject(e) }
+        })
+        assert.equal(friends.hasFriend(fixturePeer), true)
+    })
+    utils.setWarningHandler()
     assert.deepEqual(friends.getFriendsGroups(), [{ id: -2, name: 'Party' }, { id: 8, name: 'Empty' }])
     assert.deepEqual(friends.getFriendsGroupMembersList(-2), [76561197960265729n])
     assert.deepEqual(friends.getFriendsGroupMembersList(8), [])

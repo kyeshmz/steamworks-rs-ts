@@ -38,9 +38,9 @@ lives, how it is built, and what can be checked before the game runs.
   needs `unsafe` blocks and careful callback handling.
 - **No JavaScript FFI marshalling layer.** Rust calls the SDK directly. Koffi's
   overhead is small, but it is still a JavaScript-to-C transition per call.
-- **Native hosts.** A Rust addon can run in a Tauri host or another native
-  process without bundling Node. A Node-based Koffi binding needs a sidecar in
-  those environments.
+- **Native hosts.** A Tauri command can call the underlying `steamworks` Rust
+  crate directly. This package's `.node` addon still needs Node-API, just like
+  Koffi. A TypeScript frontend can call the Tauri command without shipping Node.
 - **Mature Steamworks crate.** `steamworks-rs` provides typed wrappers for
   users, friends, matchmaking, networking, inventory, workshop and callbacks.
 - **Generated declarations.** N-API generates `client.d.ts` from the Rust
@@ -56,7 +56,7 @@ lives, how it is built, and what can be checked before the game runs.
 | ABI checks | Declare C signatures and struct layouts by hand. | The Rust wrapper and compiler check more of the interface. |
 | API changes | Edit TypeScript and run the Node tests. | Edit Rust, rebuild, and regenerate declarations. |
 | Packaging | Koffi binary plus the SDK; unpack both from Electron's archive. | `.node` addon plus the SDK. |
-| Hosts | Node and Electron main process; Tauri needs a Node sidecar. | Node, Electron and native hosts, including Tauri. |
+| Hosts | Node and Electron main process. Reusing Koffi in Tauri requires a Node sidecar. | Node and Electron load the addon. Tauri can use its underlying Rust crate instead. |
 | Debugging | Signatures and layouts are visible in TypeScript. | Rust types and stack traces; slower rebuild cycle. |
 | Callback safety | Lifetime and thread affinity are managed manually. | Ownership helps, but SDK callbacks still require care. |
 
@@ -75,7 +75,7 @@ lives, how it is built, and what can be checked before the game runs.
 - Compile-time checks and memory safety in the binding code matter more than
   build simplicity.
 - The team already maintains Rust and wants generated TypeScript declarations.
-- The binding must ship as one native addon without a Node runtime.
+- A native host needs to use Steam without embedding a Node runtime.
 
 ## Verification
 

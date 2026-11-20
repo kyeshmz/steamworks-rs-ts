@@ -8,10 +8,14 @@ pub mod networking_messages {
         threadsafe_function::ThreadsafeFunctionCallMode,
         Error, Result, Status,
     };
+    use std::sync::Mutex;
     use steamworks::{
         networking_types::{NetworkingIdentity, SendFlags},
-        sys, Callback, SteamId,
+        sys, Callback, CallbackHandle, SteamId,
     };
+
+    static REQUEST_HANDLER: Mutex<Option<CallbackHandle>> = Mutex::new(None);
+    static FAILURE_HANDLER: Mutex<Option<CallbackHandle>> = Mutex::new(None);
 
     const MAX_SEND_BYTES: usize = 512 * 1024;
     const MAX_BATCH: u32 = 32;
@@ -122,12 +126,12 @@ pub mod networking_messages {
 
     unsafe impl Callback for SessionRequest {
         const ID: i32 = sys::SteamNetworkingMessagesSessionRequest_t_k_iCallback as i32;
-        const SIZE: i32 =
-            std::mem::size_of::<sys::SteamNetworkingMessagesSessionRequest_t>() as i32;
 
         unsafe fn from_raw(raw: *mut std::ffi::c_void) -> Self {
-            let remote =
-                (*raw.cast::<sys::SteamNetworkingMessagesSessionRequest_t>()).m_identityRemote;
+            let remote = raw
+                .cast::<sys::SteamNetworkingMessagesSessionRequest_t>()
+                .read_unaligned()
+                .m_identityRemote;
             Self {
                 steam_id: NetworkingIdentity::from(remote)
                     .steam_id()
@@ -142,14 +146,19 @@ pub mod networking_messages {
             Function<'_, SessionRequest, ()>,
         >,
     ) -> Result<()> {
-        let client = crate::client::get_client();
-        if let Some(handler) = handler {
-            let callback = handler.build_threadsafe_function().weak::<true>().build()?;
-            client.register_callback(move |request: SessionRequest| {
-                callback.call(request, ThreadsafeFunctionCallMode::NonBlocking);
-            });
-        } else {
-            client.register_callback(|_: SessionRequest| {});
+        let callback = handler
+            .map(|handler| handler.build_threadsafe_function().weak::<true>().build())
+            .transpose()?;
+        let mut slot = REQUEST_HANDLER
+            .lock()
+            .map_err(|_| Error::from_reason("Session handler lock poisoned"))?;
+        drop(slot.take());
+        if let Some(callback) = callback {
+            *slot = Some(crate::client::get_client().register_callback(
+                move |request: SessionRequest| {
+                    callback.call(request, ThreadsafeFunctionCallMode::NonBlocking);
+                },
+            ));
         }
         Ok(())
     }
@@ -196,26 +205,89 @@ pub mod networking_messages {
         })
     }
 
+    #[napi(object)]
+    pub struct SessionConnectionInfo {
+        pub state: i32,
+        pub steam_id64: Option<BigInt>,
+        pub listen_socket: u32,
+        pub end_reason: i32,
+        pub ping: i32,
+        pub quality_local: f64,
+        pub quality_remote: f64,
+    }
+
+    #[napi(strict)]
+    pub fn get_session_connection_info(
+        steam_id64: BigInt,
+    ) -> Result<Option<SessionConnectionInfo>> {
+        let peer = peer(steam_id64)?;
+        let _client = crate::client::get_client();
+        unsafe {
+            let messages = sys::SteamAPI_SteamNetworkingMessages_SteamAPI_v002();
+            if messages.is_null() {
+                return Err(Error::from_reason("Steam Networking Messages unavailable"));
+            }
+            let mut identity = std::mem::zeroed();
+            sys::SteamAPI_SteamNetworkingIdentity_SetSteamID64(&mut identity, peer.raw());
+            let mut info: sys::SteamNetConnectionInfo_t = std::mem::zeroed();
+            let mut status: sys::SteamNetConnectionRealTimeStatus_t = std::mem::zeroed();
+            let state = sys::SteamAPI_ISteamNetworkingMessages_GetSessionConnectionInfo(
+                messages,
+                &identity,
+                &mut info,
+                &mut status,
+            ) as i32;
+            if state == 0 {
+                return Ok(None);
+            }
+            Ok(Some(SessionConnectionInfo {
+                state,
+                steam_id64: NetworkingIdentity::from(info.m_identityRemote)
+                    .steam_id()
+                    .map(|id| id.raw().into()),
+                listen_socket: info.m_hListenSocket,
+                end_reason: info.m_eEndReason,
+                ping: status.m_nPing,
+                quality_local: status.m_flConnectionQualityLocal as f64,
+                quality_remote: status.m_flConnectionQualityRemote as f64,
+            }))
+        }
+    }
+
+    unsafe impl Callback for SessionFailure {
+        const ID: i32 = sys::SteamNetworkingMessagesSessionFailed_t_k_iCallback as i32;
+
+        unsafe fn from_raw(raw: *mut std::ffi::c_void) -> Self {
+            let event = raw
+                .cast::<sys::SteamNetworkingMessagesSessionFailed_t>()
+                .read_unaligned();
+            Self {
+                steam_id: NetworkingIdentity::from(event.m_info.m_identityRemote)
+                    .steam_id()
+                    .map(PlayerSteamId::from_steamid),
+            }
+        }
+    }
+
     #[napi]
     pub fn set_session_failed_handler(
         #[napi(ts_arg_type = "(failure: SessionFailure) => void")] handler: Option<
             Function<'_, SessionFailure, ()>,
         >,
     ) -> Result<()> {
-        let messages = crate::client::get_client().networking_messages();
-        if let Some(handler) = handler {
-            let callback = handler.build_threadsafe_function().weak::<true>().build()?;
-            messages.session_failed_callback(move |info| {
-                let steam_id = info.identity_remote().and_then(|id| id.steam_id());
-                callback.call(
-                    SessionFailure {
-                        steam_id: steam_id.map(PlayerSteamId::from_steamid),
-                    },
-                    ThreadsafeFunctionCallMode::NonBlocking,
-                );
-            });
-        } else {
-            messages.session_failed_callback(|_| {});
+        let callback = handler
+            .map(|handler| handler.build_threadsafe_function().weak::<true>().build())
+            .transpose()?;
+        let mut slot = FAILURE_HANDLER
+            .lock()
+            .map_err(|_| Error::from_reason("Session handler lock poisoned"))?;
+        drop(slot.take());
+        if let Some(callback) = callback {
+            *slot = Some(crate::client::get_client().register_callback(
+                move |failure: SessionFailure| {
+                    callback.call(failure, ThreadsafeFunctionCallMode::NonBlocking);
+                },
+            ));
         }
         Ok(())
     }

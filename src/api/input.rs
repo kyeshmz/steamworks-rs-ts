@@ -27,7 +27,7 @@ pub mod input {
 
     fn action_origin(value: f64) -> Result<sys::EInputActionOrigin, Error> {
         const COUNT: u32 = sys::EInputActionOrigin::k_EInputActionOrigin_Count as u32;
-        const _: () = assert!(COUNT == 406);
+        const _: () = assert!(COUNT == 495);
         if value.fract() != 0.0 || !(0.0..COUNT as f64).contains(&value) {
             return Err(Error::from_reason("Unknown Steam Input action origin"));
         }
@@ -150,6 +150,32 @@ pub mod input {
                 .input()
                 .get_digital_action_data(self.handle.get_u64().1, action_handle.get_u64().1)
                 .bState
+        }
+
+        #[napi(strict)]
+        pub fn get_digital_action_data(&self, action: BigInt) -> Result<DigitalActionData, Error> {
+            let action = action_handle(&action)?;
+            let data = crate::client::get_client()
+                .input()
+                .get_digital_action_data(self.handle.get_u64().1, action);
+            Ok(DigitalActionData {
+                pressed: data.bState,
+                active: data.bActive,
+            })
+        }
+
+        #[napi(strict)]
+        pub fn get_analog_action_data(&self, action: BigInt) -> Result<AnalogActionData, Error> {
+            let action = action_handle(&action)?;
+            let data = crate::client::get_client()
+                .input()
+                .get_analog_action_data(self.handle.get_u64().1, action);
+            Ok(AnalogActionData {
+                x: data.x.into(),
+                y: data.y.into(),
+                mode: data.eMode as u32,
+                active: data.bActive,
+            })
         }
 
         #[napi]
@@ -387,6 +413,20 @@ pub mod input {
     pub struct AnalogActionVector {
         pub x: f64,
         pub y: f64,
+    }
+
+    #[napi(object, object_from_js = false)]
+    pub struct DigitalActionData {
+        pub pressed: bool,
+        pub active: bool,
+    }
+
+    #[napi(object, object_from_js = false)]
+    pub struct AnalogActionData {
+        pub x: f64,
+        pub y: f64,
+        pub mode: u32,
+        pub active: bool,
     }
 
     #[napi]

@@ -1,4 +1,5 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Platform CI](https://github.com/kyeshmz/steamworks-rs-ts/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/kyeshmz/steamworks-rs-ts/actions/workflows/publish.yml)
 
 # Steamworks.ts
 
@@ -22,6 +23,8 @@ The [parity ledger](docs/coverage/parity.md) tracks donor features and remaining
 
 The [Koffi and Rust comparison](docs/koffi-vs-rust.md) explains when a TypeScript FFI binding is a better fit than this Rust addon.
 
+The addon uses [`steamworks` 0.13.1](https://docs.rs/steamworks/0.13.1/steamworks/) and the Valve SDK 1.64 redistributables supplied by `steamworks-sys` 0.13.0. See the [0.13 integration notes](docs/steamworks-0.13.md) for the JavaScript API and verification limits.
+
 ## API
 
 Pass an app ID to `init`, or omit it and provide a `steam_appid.txt` file.
@@ -41,6 +44,8 @@ if (client.achievement.activate('ACHIEVEMENT')) {
 See the [TypeScript declarations](client.d.ts) for supported calls and their signatures.
 
 ## Installation
+
+For Deviation Game or an existing `steamworks.js` import, see [swap the dependency without changing game code](docs/deviation-game.md).
 
 Until the first npm release, build a tarball for your platform from this checkout:
 
@@ -66,27 +71,29 @@ To make the steam overlay working, call the `electronEnableSteamOverlay` on the 
 require('@kyeshmz/steamworks.ts').electronEnableSteamOverlay()
 ```
 
-For the production build, copy the relevant distro files from `sdk/redistributable_bin/{YOUR_DISTRO}` into the root of your build. If you are using electron-forge, look for [#75](https://github.com/ceifa/steamworks.js/issues/75).
+For production, unpack the native addon and the matching Valve library **together** from the package's `dist/` directory. With Electron Builder, unpack the installed package path; for Deviation Game that is `node_modules/steamworks.js/**`. See the [packaged example and checks](docs/deviation-game.md#what-the-checks-cover).
 
 
 ## How to build
 
-Use [Node.js](https://nodejs.org/en/) 22.13 or newer on the 22.x line, [Rust](https://www.rust-lang.org/tools/install), and a native toolchain for your platform. You need a signed-in [Steam](https://store.steampowered.com/about/) client to exercise live client APIs.
+Use [Node.js](https://nodejs.org/en/) 22.13 or newer on the 22.x line, [Rust](https://www.rust-lang.org/tools/install), and a native toolchain with C++14 support for the server-browser callback bridge. You need a signed-in [Steam](https://store.steampowered.com/about/) client to exercise live client APIs.
 
 From the repository root, run `corepack enable`, `pnpm install --frozen-lockfile`, and `pnpm run build:debug` to build the library. The build regenerates `client.d.ts` from the Rust signatures. The root `index.d.ts` is checked in; update it when the root exports in `index.js` change.
 
 ### CI coverage
 
-The [release workflow](.github/workflows/publish.yml) builds the native addon for each target and checks the **packed release tarball** in Node.js and the pinned Electron main process. On macOS, Apple Silicon and Intel have separate native build and runtime jobs. Electron asserts its platform and architecture before loading the binary.
+Open [public Platform CI runs](https://github.com/kyeshmz/steamworks-rs-ts/actions/workflows/publish.yml) and select a revision to see each configuration's result. The [workflow](.github/workflows/publish.yml) builds four native addons and packs them into **one tarball**. Every runtime job uses that artifact; a distribution-specific rebuild cannot hide an incompatible release binary.
 
-| Target | Native runner | Runtime checks |
+| Runtime | Architecture | Checks against the tarball |
 |---|---|---|
-| macOS Apple Silicon (arm64) | `macos-15` | Node.js + Electron |
-| macOS Intel (x64) | `macos-15-intel` | Node.js + Electron |
-| Windows x64 | `windows-latest` | Node.js + Electron |
-| Linux x64 | `ubuntu-latest` | Node.js + Electron under Xvfb |
+| Windows Server 2022 and 2025 | x64 | Node 22, 24, 26; pinned Electron main process on each OS |
+| macOS 15 and 26 | Intel x64 and Apple Silicon arm64, natively | Node 22, 24, 26; pinned Electron on each OS and architecture |
+| Ubuntu 22.04, 24.04 and 26.04 | x64 | Node 22, 24, 26; pinned Electron under Xvfb on each OS |
+| Debian 12 and 13, Fedora 44, Rocky Linux 9, Arch Linux (rolling) | x64 | Node 22, 24, 26 in each distro's glibc userspace; native loading and API checks |
 
-Other gates cover Rust formatting, Clippy and unit tests, strict TypeScript compilation in a clean package consumer, and offline Steam client/server fixtures on both Macs. These checks do not sign in to Steam or validate overlay rendering. GitHub Actions is currently disabled on this repository.
+`Platform compatibility` passes only when every runtime row passes. Pull requests and pushes to `main` or `ci/**` run the checks; release publishing on `main` is gated on the result. Native-host jobs install the tarball as `steamworks.js` and typecheck a consumer. Linux and macOS also exercise offline SDK fixtures. Container results cover distro libraries, not desktop integration or distro-specific kernels.
+
+The package ships a GNU/Linux x64 binary, not a musl/Alpine or Linux ARM build. These checks do not sign in to Steam or verify visible overlay rendering, real relay traffic, or Steam Deck hardware.
 
 ## Releases
 
