@@ -50,4 +50,10 @@ The packaging check reads the adapter, IPC constants, Electron version and build
 
 The surface comparison starts each package in a separate Node process. Fully restart the game when swapping packages: loading two addons that require different versions of the same `libsteam_api.so` into one Linux process can make the dynamic linker reuse the first copy.
 
-Neither check contacts the Steam Partner API. Signed-in ticket verification, visible Shift+Tab overlay, and installed Steam depot launches need separate release tests on the operating systems you ship.
+The offline checks do not contact the Steam Partner API. To try the **real account path on Linux x64**, open Steam with a test account licensed for `3104020` and run:
+
+```sh
+sh test/deviation-game/pack.sh .. 9304b71d7752d288c80827a9c5bc8d77152a8c3f live /path/to/verified-package.tgz
+```
+
+The `live` mode loads the matching Valve library and runs the unmodified game's Steam adapter. It checks online status, identity, entitlement, the game's stat and achievement reads, and ticket issuance. The final ticket verification requires the game's normal `STEAM_API_KEY` and `STEAM_VERIFICATION_SECRET` in the local environment. Missing prerequisites fail the check rather than selecting a mock. This does not exercise a visible Shift+Tab overlay or an installed Steam depot launch.

@@ -5,7 +5,7 @@ root=$(CDPATH='' cd "$(dirname "$0")/../.." && pwd)
 game=$(CDPATH='' cd "${1:?Pass the Deviation Game repository path}" && pwd)
 rev=$(git -C "$game" rev-parse --verify "${2:-HEAD}^{commit}")
 mode=${3:-vendor}
-case "$mode" in vendor|fixture) ;; *) echo 'Expected vendor or fixture' >&2; exit 2 ;; esac
+case "$mode" in vendor|fixture|live) ;; *) echo 'Expected vendor, fixture or live' >&2; exit 2 ;; esac
 test "$(uname -sm)" = 'Linux x86_64'
 mkdir -p "$root/target/deviation-game"
 run=$(mktemp -d "$root/target/deviation-game/run.XXXXXX")
@@ -60,8 +60,13 @@ sdk="$bundle/resources/app.asar.unpacked/node_modules/steamworks.js/dist/linux64
 for file in steamworksjs.linux-x64-gnu.node libsteam_api.so; do
     cmp "$sdk/$file" "node_modules/steamworks.js/dist/linux64/$file"
 done
-unset E2E_DEBUG_STEAM STEAM_API_KEY STEAM_VERIFICATION_SECRET LD_PRELOAD LD_LIBRARY_PATH
-unset FIXTURE_CASE FIXTURE_RESTART
+unset E2E_DEBUG_STEAM E2E_STEAM_ID LD_PRELOAD LD_LIBRARY_PATH FIXTURE_CASE FIXTURE_RESTART
+export DEVIATION_STEAM_TEST_MODE="$mode"
+if [ "$mode" = live ]; then
+    cmp "$sdk/libsteam_api.so" "$root/sdk/redistributable_bin/linux64/libsteam_api.so"
+else
+    unset STEAM_API_KEY STEAM_VERIFICATION_SECRET
+fi
 if [ "$mode" = fixture ]; then
     fixture=$(sh "$root/test/deviation-native/run.sh" "$app/node_modules/steamworks.js" sdk-path)
     cp "$fixture" "$sdk/fixture.so"

@@ -15,7 +15,34 @@ app.whenReady().then(async () => {
         assert.ok(libraries.includes(join(dist, binary)), `Packaged process did not map ${binary} from ${dist}`)
     }
     const adapter = require('./adapter.cjs')
-    if (process.env.FIXTURE_CASE === 'deviation-game') {
+    if (process.env.DEVIATION_STEAM_TEST_MODE === 'live') {
+        console.log('Live Deviation Game adapter: initializing App ID 3104020 with the packaged Valve library')
+        const handlers = new Map()
+        await adapter.init({ handle(name, fn) { handlers.set(name, fn) } })
+        const native = require(join(dist, 'steamworksjs.linux-x64-gnu.node'))
+        assert.equal(native.utils.getAppId(), 3104020)
+        assert.equal(native.localplayer.isLoggedOn(), true, 'Steam account is not online')
+        const call = (name, ...args) => handlers.get('STEAM_' + name)(undefined, ...args)
+        const id = await call('GET_ID')
+        assert.ok(/^[1-9]\d{16}$/.test(id) && BigInt(id) === native.localplayer.getSteamId().steamId64, 'Game did not return the signed-in SteamID')
+        assert.ok((await call('GET_NAME')).length > 0, 'Game did not return a persona name')
+        assert.ok(native.apps.isSubscribedApp(3104020), 'Steam does not report access to Deviation Game')
+        console.log('Signed-in identity and Deviation entitlement confirmed; Steam reports game installed:', await call('APP_IS_INSTALLED'))
+        const stats = await Promise.all(['GAMES_WON', 'GAMES_LOST', 'GAMES_TIED'].map(name => call('GET_STAT', name)))
+        const statsReady = stats.every(Number.isInteger)
+        const achievementReady = native.achievement.names().includes('GAMES_WON_1') && typeof await call('CHECK_ACHIEVEMENT', 'GAMES_WON_1') === 'boolean'
+        console.log('Live game reads: stat counters available:', statsReady, 'configured achievement readable:', achievementReady)
+        const ticket = await call('GET_SESSION_TICKET')
+        assert.ok(typeof ticket === 'string' && /^(?:[0-9a-f]{2})+$/i.test(ticket), 'Game did not receive a session ticket')
+        console.log('Game received a nonempty Steam ticket')
+        if (!process.env.STEAM_API_KEY || !process.env.STEAM_VERIFICATION_SECRET) {
+            throw Error('Partner ticket verification not run: game verification credentials are not configured')
+        }
+        const proof = await call('VERIFY_TICKET')
+        assert.ok(proof?.steamId === id && typeof proof.verificationToken === 'string' && proof.verificationToken.length > 0, 'Game could not verify the signed-in identity with the Steam Partner API')
+        console.log('Live game adapter verified the same Steam account with Valve')
+        assert.ok(statsReady && achievementReady, 'Live authentication succeeded, but game stats or achievement data were unavailable')
+    } else if (process.env.FIXTURE_CASE === 'deviation-game') {
         const handlers = new Map()
         assert.equal(sdk.restartAppIfNecessary(3104020), false)
         const existing = new BrowserWindow({ show: false })
