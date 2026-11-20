@@ -1,4 +1,3 @@
-// Run from the repository root after generating client.d.ts.
 const fs = require('node:fs')
 const { execFileSync } = require('node:child_process')
 const { createHash } = require('node:crypto')

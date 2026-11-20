@@ -1,4 +1,3 @@
-//! Adapted from steamworks.js PRs #211 (Spencer McWilliams) and #186 (Dustin Lacewell).
 use napi_derive::napi;
 
 #[napi]
@@ -29,7 +28,6 @@ pub mod friends {
         })
     }
 
-    /// Requests fresh presence. Steam delivers FriendRichPresenceUpdate when available.
     #[napi]
     pub fn request_rich_presence(steam_id64: BigInt) -> Result<(), Error> {
         let id = steam_id(steam_id64)?;
@@ -38,7 +36,6 @@ pub mod friends {
         })
     }
 
-    /// Read a cached presence value. Missing keys return the empty string.
     #[napi]
     pub fn get_rich_presence(steam_id64: BigInt, key: String) -> Result<String, Error> {
         let id = steam_id(steam_id64)?;
@@ -82,7 +79,6 @@ pub mod friends {
     pub struct Persona {
         pub name: String,
         pub state: String,
-        /// 64 x 64 RGBA bytes when Steam has an avatar available.
         pub medium_avatar: Option<Buffer>,
     }
 
@@ -176,7 +172,6 @@ pub mod friends {
         }
     }
 
-    /// Defaults to immediate friends, excluding pending invitations.
     #[napi]
     pub fn get_friends(filter: Option<FriendFilter>) -> Vec<BigInt> {
         crate::client::get_client()
@@ -200,7 +195,6 @@ pub mod friends {
         Large,
     }
 
-    /// RGBA pixels at 32x32, 64x64, or 184x184. Returns null when unavailable.
     #[napi(catch_unwind)]
     pub fn get_avatar(steam_id64: BigInt, size: AvatarSize) -> Result<Option<Buffer>, Error> {
         let id = steam_id(steam_id64)?;
@@ -233,7 +227,6 @@ pub mod friends {
         })
     }
 
-    /// Defaults to name only. True when Steam started a fetch; false when cached.
     #[napi]
     pub fn request_user_information(
         steam_id64: BigInt,
@@ -247,12 +240,10 @@ pub mod friends {
 
     #[napi(object)]
     pub struct FriendsGroup {
-        /// Signed 16-bit group ID as Steam reports it. Steam's -1 invalid marker never appears here.
         pub id: i16,
         pub name: String,
     }
 
-    /// Named friends groups of the signed-in user, in Steam's order. Empty when the account has none.
     #[napi]
     pub fn get_friends_groups() -> Result<Vec<FriendsGroup>, Error> {
         with_friends(|f| unsafe {
@@ -274,10 +265,8 @@ pub mod friends {
         })
     }
 
-    // The addon's ceiling on one group read; Steam documents no per-group member maximum.
     const MAX_GROUP_MEMBERS: i32 = 4096;
 
-    /// Member SteamID64s of one named group. IDs outside the user's groups throw; an empty group returns an empty list.
     #[napi]
     pub fn get_friends_group_members_list(group_id: f64) -> Result<Vec<BigInt>, Error> {
         if group_id.fract() != 0.0
@@ -288,7 +277,6 @@ pub mod friends {
             ));
         }
         let group_id = group_id as i16;
-        // Steam documents NULL names only for invalid group IDs, so this gates the count call below.
         let name = with_friends(|f| unsafe {
             sys::SteamAPI_ISteamFriends_GetFriendsGroupName(f, group_id)
         })?;

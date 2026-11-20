@@ -135,7 +135,6 @@ pub mod workshop {
         VotedOn,
         VotedUp,
         VotedDown,
-        // Deprecated: WillVoteLater,
         Favorited,
         Subscribed,
         UsedOrPlayed,
@@ -149,7 +148,6 @@ pub mod workshop {
                 UserListType::VotedOn => steamworks::UserList::VotedOn,
                 UserListType::VotedUp => steamworks::UserList::VotedUp,
                 UserListType::VotedDown => steamworks::UserList::VotedDown,
-                // UserListType::WillVoteLater => steamworks::UserList::WillVoteLater, // Deprecated
                 UserListType::Favorited => steamworks::UserList::Favorited,
                 UserListType::Subscribed => steamworks::UserList::Subscribed,
                 UserListType::UsedOrPlayed => steamworks::UserList::UsedOrPlayed,
@@ -188,19 +186,19 @@ pub mod workshop {
     #[derive(Debug)]
     #[napi(object)]
     pub struct WorkshopItemStatistic {
-        pub num_subscriptions: Option<BigInt>, //   0	gets the number of subscriptions.
-        pub num_favorites: Option<BigInt>,     //   1	gets the number of favorites.
-        pub num_followers: Option<BigInt>,     //   2	gets the number of followers.
-        pub num_unique_subscriptions: Option<BigInt>, // 3	gets the number of unique subscriptions.
-        pub num_unique_favorites: Option<BigInt>, // 4	gets the number of unique favorites.
-        pub num_unique_followers: Option<BigInt>, // 5	gets the number of unique followers.
-        pub num_unique_website_views: Option<BigInt>, //  6	gets the number of unique views the item has on its steam workshop page.
-        pub report_score: Option<BigInt>, //    7	gets the number of times the item has been reported.
-        pub num_seconds_played: Option<BigInt>, //   8	gets the total number of seconds this item has been used across all players.
-        pub num_playtime_sessions: Option<BigInt>, //    9	gets the total number of play sessions this item has been used in.
-        pub num_comments: Option<BigInt>, //    10	gets the number of comments on the items that steam has on its steam workshop page.
-        pub num_seconds_played_during_time_period: Option<BigInt>, //   11	gets the number of seconds this item has been used over the given time period.
-        pub num_playtime_sessions_during_time_period: Option<BigInt>, //    12	Gets the number of sessions this item has been used in over the given time period.
+        pub num_subscriptions: Option<BigInt>,
+        pub num_favorites: Option<BigInt>,
+        pub num_followers: Option<BigInt>,
+        pub num_unique_subscriptions: Option<BigInt>,
+        pub num_unique_favorites: Option<BigInt>,
+        pub num_unique_followers: Option<BigInt>,
+        pub num_unique_website_views: Option<BigInt>,
+        pub report_score: Option<BigInt>,
+        pub num_seconds_played: Option<BigInt>,
+        pub num_playtime_sessions: Option<BigInt>,
+        pub num_comments: Option<BigInt>,
+        pub num_seconds_played_during_time_period: Option<BigInt>,
+        pub num_playtime_sessions_during_time_period: Option<BigInt>,
     }
 
     impl WorkshopItemStatistic {
@@ -264,11 +262,8 @@ pub mod workshop {
         pub title: String,
         pub description: String,
         pub owner: PlayerSteamId,
-        /// Time created in unix epoch seconds format
         pub time_created: u32,
-        /// Time updated in unix epoch seconds format
         pub time_updated: u32,
-        /// Time when the user added the published item to their list (not always applicable), provided in Unix epoch format (time since Jan 1st, 1970).
         pub time_added_to_user_list: u32,
         pub visibility: UgcItemVisibility,
         pub banned: bool,
@@ -283,7 +278,7 @@ pub mod workshop {
         pub metadata: Option<String>,
         pub key_value_tags: Option<Vec<KeyValueTag>>,
         pub children: Option<Vec<BigInt>>,
-        pub statistics: WorkshopItemStatistic, // Is it necessary to design this as optional?
+        pub statistics: WorkshopItemStatistic,
     }
 
     impl WorkshopItem {
@@ -395,7 +390,6 @@ pub mod workshop {
         pub return_children: Option<bool>,
         pub include_key_value_tags: Option<bool>,
         pub required_key_value_tags: Option<Vec<KeyValueTag>>,
-        /// Only supported by getUserItems.
         pub cloud_file_name_filter: Option<String>,
         pub include_long_description: Option<bool>,
         pub include_additional_previews: Option<bool>,
@@ -584,7 +578,6 @@ pub mod workshop {
         let (tx, rx) = oneshot::channel();
 
         {
-            // Start configuring the query for all items
             let mut query_handle = client
                 .ugc()
                 .query_all(
@@ -629,7 +622,6 @@ pub mod workshop {
         let (tx, rx) = oneshot::channel();
 
         {
-            // Start configuring the query for user items
             let mut query_handle = client
                 .ugc()
                 .query_user(

@@ -18,21 +18,10 @@ pub mod networking {
     }
 
     #[napi]
-    /// The method used to send a packet
     pub enum SendType {
-        /// Send the packet directly over udp.
-        ///
-        /// Can't be larger than 1200 bytes
         Unreliable,
-        /// Like `Unreliable` but doesn't buffer packets
-        /// sent before the connection has started.
         UnreliableNoDelay,
-        /// Reliable packet sending.
-        ///
-        /// Can't be larger than 1 megabyte.
         Reliable,
-        /// Like `Reliable` but applies the nagle
-        /// algorithm to packets being sent
         ReliableWithBuffering,
     }
 

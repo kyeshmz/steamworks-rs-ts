@@ -52,7 +52,6 @@ pub mod apps {
         })
     }
 
-    /// Starts a background download for an owned DLC.
     #[napi]
     pub fn install_dlc(app_id: u32) -> Result<(), Error> {
         with_apps(|apps| unsafe { sys::SteamAPI_ISteamApps_InstallDLC(apps, app_id) })

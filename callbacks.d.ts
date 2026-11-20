@@ -1,23 +1,13 @@
 import client = require('./client')
 
 export const enum ChatMemberStateChange {
-    /** This user has joined or is joining the lobby. */
     Entered,
-    /** This user has left or is leaving the lobby. */
     Left,
-    /** User disconnected without leaving the lobby first. */
     Disconnected,
-    /** The user has been kicked. */
     Kicked,
-    /** The user has been kicked and banned. */
     Banned,
 }
 
-/**
- * The kind of a lobby chat entry, as serialized from `steamworks::ChatEntryType`
- * (a serde unit variant, so it arrives as the variant's name).
- * {@link https://partner.steamgames.com/doc/api/steam_api#EChatEntryType}
- */
 export type ChatEntryType =
     | 'Invalid'
     | 'ChatMsg'
@@ -40,7 +30,6 @@ export interface CallbackReturns {
     [client.callback.SteamCallback.ValidateAuthTicketResponse]: {
         steam_id: bigint
         owner_steam_id: bigint
-        /** Steam EAuthSessionResponse. Only zero indicates success. */
         response: number
     }
     [client.callback.SteamCallback.ScreenshotRequested]: {}
@@ -76,7 +65,6 @@ export interface CallbackReturns {
         making_change: bigint
         member_state_change: ChatMemberStateChange
     }
-    /** A chat message arrived in a lobby you are a member of; read it with `Lobby.getChatEntry(chat_id)`. */
     [client.callback.SteamCallback.LobbyChatMsg]: {
         lobby: bigint
         user: bigint

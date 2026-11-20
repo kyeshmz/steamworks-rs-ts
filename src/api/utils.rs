@@ -59,7 +59,6 @@ pub mod utils {
         MultipleLines,
     }
 
-    /// @returns the entered text, or null if cancelled or could not show the input
     #[napi]
     pub async fn show_gamepad_text_input(
         input_mode: GamepadTextInputMode,
@@ -110,7 +109,6 @@ pub mod utils {
         Numeric,
     }
 
-    /// @returns true if the floating keyboard was shown, otherwise, false
     #[napi]
     pub async fn show_floating_gamepad_text_input(
         keyboard_mode: FloatingGamepadTextInputMode,

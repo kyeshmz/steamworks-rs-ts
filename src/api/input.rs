@@ -31,7 +31,6 @@ pub mod input {
         if value.fract() != 0.0 || !(0.0..COUNT as f64).contains(&value) {
             return Err(Error::from_reason("Unknown Steam Input action origin"));
         }
-        // All three fbb7963 binding targets define every discriminant from 0 through 405.
         Ok(unsafe { std::mem::transmute::<u32, sys::EInputActionOrigin>(value as u32) })
     }
 
@@ -119,7 +118,6 @@ pub mod input {
             let action_set = action_handle(&action_set)?;
             let action = action_handle(&action)?;
             with_input(|input| {
-                // Newer Steam clients can return origins not represented by the pinned Rust enum.
                 let mut origins = [0u32; sys::STEAM_INPUT_MAX_ORIGINS as usize];
                 let n = unsafe {
                     get(
@@ -180,7 +178,6 @@ pub mod input {
             self.handle.clone()
         }
 
-        /// Read orientation, acceleration and angular velocity from a motion-capable controller.
         #[napi]
         pub fn get_motion_data(&self) -> MotionData {
             let data = crate::client::get_client()
@@ -200,7 +197,6 @@ pub mod input {
             }
         }
 
-        /// Set RGB on a supported controller, or restore the user's preferred color.
         #[napi]
         pub fn set_lightbar_color(
             &self,
@@ -327,7 +323,6 @@ pub mod input {
             })
         }
 
-        /// Motor speeds range from 0 (stop) to 65535.
         #[napi]
         pub fn trigger_vibration(&self, left_speed: u16, right_speed: u16) -> Result<(), Error> {
             with_input(|input| unsafe {
@@ -340,7 +335,6 @@ pub mod input {
             })
         }
 
-        /// Send a haptic pulse on Steam Deck or Steam Controller.
         #[napi]
         pub fn trigger_simple_haptic_event(
             &self,
@@ -507,7 +501,6 @@ pub mod input {
         crate::client::get_client().input().run_frame();
     }
 
-    /// Enable hotplug notifications after registering the device callbacks.
     #[napi]
     pub fn enable_device_callbacks() -> Result<(), Error> {
         with_input(|input| unsafe { sys::SteamAPI_ISteamInput_EnableDeviceCallbacks(input) })

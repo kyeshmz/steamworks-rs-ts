@@ -35,7 +35,6 @@ pub mod screenshots {
         .map_err(|e| Error::from_reason(e.to_string()))
     }
 
-    /// Supply tightly packed RGB24 rows, without alpha or stride padding.
     #[napi]
     pub fn write_screenshot(data: Buffer, width: i32, height: i32) -> napi::Result<u32> {
         let size = i64::from(width) * i64::from(height);
@@ -106,7 +105,6 @@ pub mod screenshots {
             .is_screenshots_hooked()
     }
 
-    /// Asks the Steam overlay to capture the current frame.
     #[napi]
     pub fn trigger_screenshot() {
         crate::client::get_client()
@@ -114,7 +112,6 @@ pub mod screenshots {
             .trigger_screenshot();
     }
 
-    /// Imports a JPEG from disk. Pass null for thumbnailFilename to let Steam generate it.
     #[napi(
         ts_args_type = "filename: string, thumbnailFilename: string | null, width: number, height: number"
     )]

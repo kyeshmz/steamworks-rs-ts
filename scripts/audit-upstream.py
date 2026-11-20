@@ -59,7 +59,6 @@ def capture():
     }
 
 
-# Each report gets one primary workstream; overlapping needs are noted in the plan.
 ISSUES = {
     "Release and maintenance": "199 193 187 184 183 176 162 139 101 88 39 33",
     "Packaging and platform support": "206 194 192 188 173 156 153 149 136 131 129 126 123 122 121 120 103 93 91 83 80 75 71 68 67 64 62 61 51 46 45 42 38 26 19 18 14",

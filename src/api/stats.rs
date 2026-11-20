@@ -32,7 +32,6 @@ pub mod stats {
             .map(f64::from)
     }
 
-    /// Updates a FLOAT stat locally. Call store() to persist it on Steam.
     #[napi]
     pub fn set_float(name: String, value: f64) -> bool {
         let value = value as f32;

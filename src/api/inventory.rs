@@ -54,7 +54,6 @@ pub mod inventory {
 
     impl Drop for ResultHandle {
         fn drop(&mut self) {
-            // init never replaces the process client, even while this request awaits Steam.
             unsafe {
                 sys::SteamAPI_ISteamInventory_DestroyResult(
                     sys::SteamAPI_SteamInventory_v003(),
@@ -74,7 +73,6 @@ pub mod inventory {
         }
     }
 
-    // k_SteamItemInstanceIDInvalid is all bits set, so no real item ID uses every bit.
     fn mutation_id(value: &BigInt) -> Result<u64> {
         match instance_id(value)? {
             u64::MAX => Err(Error::from_reason(
@@ -358,7 +356,6 @@ pub mod inventory {
         })
     }
 
-    /// Exchanges item quantities in one atomic Steam transaction and returns the resulting snapshot.
     #[napi]
     pub async fn exchange_items(
         generate: Vec<ExchangeGenerate>,
@@ -369,7 +366,6 @@ pub mod inventory {
         await_ready(handle).await?.snapshot()
     }
 
-    /// Consumes item quantity permanently and returns the Steam-signed receipt bytes.
     #[napi]
     pub async fn consume_item_serialized(
         item_id: BigInt,
@@ -383,7 +379,6 @@ pub mod inventory {
         await_ready(handle).await?.receipt()
     }
 
-    /// Exchanges items in one atomic Steam transaction and returns the Steam-signed receipt bytes.
     #[napi]
     pub async fn exchange_items_serialized(
         generate: Vec<ExchangeGenerate>,
@@ -403,13 +398,11 @@ pub mod inventory {
         Ok(read(interface))
     }
 
-    /// Requests a refresh. A successful request does not mean definitions are ready.
     #[napi]
     pub fn load_item_definitions() -> Result<bool> {
         with_inventory(|inv| unsafe { sys::SteamAPI_ISteamInventory_LoadItemDefinitions(inv) })
     }
 
-    /// Returns the cached definition IDs, or null if Steam could not read them.
     #[napi]
     pub fn get_item_definition_ids() -> Result<Option<Vec<i32>>> {
         with_inventory(|inv| {
@@ -419,7 +412,6 @@ pub mod inventory {
         })
     }
 
-    /// Omit name to read the comma-separated property names. Missing properties return null.
     #[napi]
     pub fn get_item_definition_property(
         definition: i32,
@@ -448,7 +440,6 @@ pub mod inventory {
         })
     }
 
-    /// Records play time for playtime-based item drops. Does not grant an item.
     #[napi]
     pub fn send_item_drop_heartbeat() -> Result<()> {
         with_inventory(|inv| unsafe { sys::SteamAPI_ISteamInventory_SendItemDropHeartbeat(inv) })

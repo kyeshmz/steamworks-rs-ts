@@ -49,7 +49,6 @@ pub mod achievement {
     #[napi]
     pub fn names() -> Vec<String> {
         let stats = crate::client::get_client().user_stats();
-        // The pinned SDK panics inside get_achievement_names when the count is zero.
         if stats.get_num_achievements().is_err() {
             return Vec::new();
         }
@@ -64,7 +63,6 @@ pub mod achievement {
             .unwrap_or_default()
     }
 
-    /// Use "name", "desc", or "hidden". The hidden flag is "0" or "1".
     #[napi]
     pub fn get_display_attribute(achievement: String, key: String) -> Option<String> {
         if achievement.contains('\0') || !matches!(key.as_str(), "name" | "desc" | "hidden") {
@@ -79,7 +77,6 @@ pub mod achievement {
             .map(str::to_owned)
     }
 
-    /// Returns a 64x64 RGBA buffer, or null if the icon is unavailable.
     #[napi]
     pub fn get_icon(achievement: String) -> Option<Buffer> {
         if achievement.contains('\0') {
@@ -92,7 +89,6 @@ pub mod achievement {
             .map(Buffer::from)
     }
 
-    /// Wait for Steam's global percentage request before reading individual achievements.
     #[napi]
     pub async fn request_global_percentages() -> napi::Result<()> {
         let (tx, rx) = oneshot::channel();
@@ -111,7 +107,6 @@ pub mod achievement {
             .map_err(|e| Error::from_reason(e.to_string()))
     }
 
-    /// Returns the cached unlock percentage (0-100), or null if Steam has no data.
     #[napi]
     pub fn get_achieved_percent(achievement: String) -> Option<f64> {
         if achievement.contains('\0') {

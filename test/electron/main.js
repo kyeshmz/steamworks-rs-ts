@@ -14,13 +14,12 @@ function createWindow() {
         }
     })
 
-    // will be true when opened from steam big picture
     if (process.env.SteamTenfoot) {
         mainWindow.setFullScreen(true)
     } else {
         mainWindow.maximize()
     }
-    
+
     mainWindow.webContents.openDevTools()
     mainWindow.loadFile('index.html')
 }

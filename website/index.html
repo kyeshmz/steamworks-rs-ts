@@ -9,7 +9,7 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="Steamworks.ts · Wire your game into Steam.">
   <meta property="og:description" content="Native Steamworks bindings for Node.js and Electron. Explore the API, build from source, and connect a game client.">
-  <meta property="og:image" content="https://raw.githubusercontent.com/kyeshmz/steamworks.ts/main/website/social.png">
+  <meta property="og:image" content="https://raw.githubusercontent.com/kyeshmz/steamworks-rs-ts/main/website/social.png">
   <meta property="og:image:alt" content="Steamworks.ts: two game clients wired to a dedicated server.">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -21,7 +21,7 @@
   <div class="dark">
     <header class="shell mast">
       <a class="brand" href="./"><img width="32" height="32" src="favicon.svg" alt="">Steamworks<span>.ts</span></a>
-      <nav aria-label="Primary"><a href="#start">Quickstart</a><a href="https://github.com/kyeshmz/steamworks.ts/blob/main/docs/fork-features.md">Docs</a><a class="repo" href="https://github.com/kyeshmz/steamworks.ts">GitHub <span aria-hidden="true">↗</span></a></nav>
+      <nav aria-label="Primary"><a href="#start">Quickstart</a><a href="https://github.com/kyeshmz/steamworks-rs-ts/blob/main/docs/fork-features.md">Docs</a><a class="repo" href="https://github.com/kyeshmz/steamworks-rs-ts">GitHub <span aria-hidden="true">↗</span></a></nav>
     </header>
   </div>
   <main id="main">
@@ -31,7 +31,7 @@
           <p class="eyebrow"><i></i> Native bindings <b>/</b> Node.js + Electron</p>
           <h1>Wire your game<br>into <em>Steam.</em></h1>
           <p class="lede">Build lobbies, move packets, and run dedicated servers with the Steamworks SDK from JavaScript or TypeScript.</p>
-          <div class="actions"><a class="button" href="#start">Get started <span aria-hidden="true">↓</span></a><a class="text-link" href="https://github.com/kyeshmz/steamworks.ts/blob/main/client.d.ts">API declarations <span aria-hidden="true">↗</span></a></div>
+          <div class="actions"><a class="button" href="#start">Get started <span aria-hidden="true">↓</span></a><a class="text-link" href="https://github.com/kyeshmz/steamworks-rs-ts/blob/main/client.d.ts">API declarations <span aria-hidden="true">↗</span></a></div>
         </div>
         <figure>
           <div class="figure-head"><span>FIG. 01</span> Network topology</div>
@@ -44,22 +44,21 @@
       <p class="section-id">01 <b>/</b> API surface</p>
       <h2 id="tools">From lobby to live match<span>.</span></h2>
       <div class="cards">
-        <article><span class="glyph" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="11" cy="10" r="4"/><path d="M3 26v-4a8 8 0 0 1 16 0v4zm17-20a4 4 0 0 1 0 8m2 3a7 7 0 0 1 7 7v2h-6"/></svg></span><h3>Assemble the party</h3><p>Filter lobbies by open slots or distance, invite friends, and exchange chat messages before the match.</p><a href="https://github.com/kyeshmz/steamworks.ts/blob/main/docs/fork-features.md">Lobby and friends APIs ↗</a></article>
-        <article><span class="glyph" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M3 10h24m-7-7 7 7-7 7M29 22H5m7-7-7 7 7 7"/></svg></span><h3>Connect the players</h3><p>Open P2P or direct-IP sockets. Use poll groups to receive messages from several connections together.</p><a href="https://github.com/kyeshmz/steamworks.ts/blob/main/docs/networking-sockets.md">Networking sockets ↗</a></article>
-        <article><span class="glyph" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M3 4h26v10H3zm0 14h26v10H3zM7 9h9M7 23h9m6-14h3m-3 14h3"/></svg></span><h3>Host the match</h3><p>Start a dedicated server in its own Node process. Publish its listing, handle callbacks, and check its connection.</p><a href="https://github.com/kyeshmz/steamworks.ts/blob/main/docs/game-server.md">Game server guide ↗</a></article>
+        <article><span class="glyph" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="11" cy="10" r="4"/><path d="M3 26v-4a8 8 0 0 1 16 0v4zm17-20a4 4 0 0 1 0 8m2 3a7 7 0 0 1 7 7v2h-6"/></svg></span><h3>Assemble the party</h3><p>Filter lobbies by open slots or distance, invite friends, and exchange chat messages before the match.</p><a href="https://github.com/kyeshmz/steamworks-rs-ts/blob/main/docs/fork-features.md">Lobby and friends APIs ↗</a></article>
+        <article><span class="glyph" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M3 10h24m-7-7 7 7-7 7M29 22H5m7-7-7 7 7 7"/></svg></span><h3>Connect the players</h3><p>Open P2P or direct-IP sockets. Use poll groups to receive messages from several connections together.</p><a href="https://github.com/kyeshmz/steamworks-rs-ts/blob/main/docs/networking-sockets.md">Networking sockets ↗</a></article>
+        <article><span class="glyph" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M3 4h26v10H3zm0 14h26v10H3zM7 9h9M7 23h9m6-14h3m-3 14h3"/></svg></span><h3>Host the match</h3><p>Start a dedicated server in its own Node process. Publish its listing, handle callbacks, and check its connection.</p><a href="https://github.com/kyeshmz/steamworks-rs-ts/blob/main/docs/game-server.md">Game server guide ↗</a></article>
       </div>
     </section>
     <section id="start" class="shell start" aria-labelledby="first">
       <div><p class="section-id">02 <b>/</b> Quickstart</p><h2 id="first">Meet your first player<span>.</span></h2>
-      <p><a href="https://github.com/kyeshmz/steamworks.ts#installation">Build and pack the native addon</a> for your platform. From your game directory, install the resulting tarball using its local path.</p>
+      <p><a href="https://github.com/kyeshmz/steamworks-rs-ts#installation">Build and pack the native addon</a> for your platform. From your game directory, install the resulting tarball using its local path.</p>
       <div class="command"><code id="command">pnpm add /path/to/kyeshmz-steamworks.ts-0.4.0.tgz</code><button type="button" id="copy" hidden>Copy</button></div><div class="feedback" role="status" id="status"></div></div>
       <div class="sample"><div class="file"><span>client.cjs</span><span>JavaScript</span></div><pre><code><span class="kw">const</span> steamworks = require(
   <span class="str">'@kyeshmz/steamworks.ts'</span>
 )
-
 <span class="kw">const</span> client = steamworks.init(<span class="num">480</span>)
 console.log(client.localplayer.getName())</code></pre><p>With Steam running and signed in, run <code>node client.cjs</code> to print your Steam display name. App ID 480 is Spacewar.</p></div>
     </section>
   </main>
-  <footer class="dark"><div class="shell foot"><div><strong>Steamworks.ts</strong><p>Based on <a href="https://github.com/ceifa/steamworks.js">steamworks.js</a>. Not affiliated with Valve.</p></div><a href="https://github.com/kyeshmz/steamworks.ts/blob/main/LICENSE">MIT license ↗</a></div></footer>
+  <footer class="dark"><div class="shell foot"><div><strong>Steamworks.ts</strong><p>Based on <a href="https://github.com/ceifa/steamworks.js">steamworks.js</a>. Not affiliated with Valve.</p></div><a href="https://github.com/kyeshmz/steamworks-rs-ts/blob/main/LICENSE">MIT license ↗</a></div></footer>
 </body></html>

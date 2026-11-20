@@ -6,5 +6,4 @@ export { SteamCallback };
 export { gameServer };
 export type Client = typeof import('./client.d');
 declare const SteamCallback: typeof import("./client.d").callback.SteamCallback;
-/** @type {Client['game_server']} */
 declare const gameServer: Client['game_server'];

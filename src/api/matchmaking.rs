@@ -54,7 +54,6 @@ pub mod matchmaking {
     pub struct LobbyStringFilter {
         pub key: String,
         pub value: String,
-        /// Defaults to Equal.
         pub comparison: Option<LobbyComparison>,
     }
 
@@ -75,7 +74,6 @@ pub mod matchmaking {
     pub struct LobbyListFilter {
         pub string_filters: Option<Vec<LobbyStringFilter>>,
         pub number_filters: Option<Vec<LobbyNumberFilter>>,
-        /// Sort by proximity to these values, in priority order.
         pub near_value_filters: Option<Vec<LobbyNearFilter>>,
         pub slots_available: Option<u8>,
         pub distance: Option<LobbyDistance>,
@@ -113,7 +111,6 @@ pub mod matchmaking {
 
     impl LobbyListFilter {
         fn apply(self, client: &steamworks::Client) -> Result<(), Error> {
-            // Validate everything before changing Steam's pending filters; they cannot be rolled back.
             let strings = self
                 .string_filters
                 .unwrap_or_default()
@@ -142,7 +139,6 @@ pub mod matchmaking {
                 return Err(Error::from_reason("Lobby result count must be nonnegative"));
             }
             let mm = raw_matchmaking(client)?;
-            // fbb7963's string/number/near wrappers pass str.as_ptr() without a terminating NUL.
             unsafe {
                 for (key, value, cmp) in strings {
                     sys::SteamAPI_ISteamMatchmaking_AddRequestLobbyListStringFilter(
@@ -222,7 +218,6 @@ pub mod matchmaking {
             client.friends().activate_invite_dialog(self.lobby_id);
         }
 
-        /// Broadcast up to 4096 bytes to the lobby, including the sender.
         #[napi]
         pub fn send_chat_message(&self, message: Buffer) -> Result<(), Error> {
             if !(1..=LOBBY_CHAT_MSG_MAX).contains(&message.len()) {
@@ -236,7 +231,6 @@ pub mod matchmaking {
                 .map_err(|e| Error::from_reason(e.to_string()))
         }
 
-        /// Read the bytes identified by a LobbyChatMsg callback. Missing entries return an empty buffer.
         #[napi]
         pub fn get_chat_entry(&self, chat_id: i32) -> Buffer {
             let mut buffer = [0u8; LOBBY_CHAT_MSG_MAX];
@@ -259,7 +253,6 @@ pub mod matchmaking {
             client.matchmaking().lobby_member_limit(self.lobby_id)
         }
 
-        /// Owner only. Returns false if Steam refuses the new limit.
         #[napi]
         pub fn set_member_limit(&self, limit: f64) -> Result<bool, Error> {
             if limit.fract() != 0.0 || !(0.0..=250.0).contains(&limit) {
@@ -277,7 +270,6 @@ pub mod matchmaking {
             })
         }
 
-        /// Transfer ownership to a current lobby member. Only the current owner can do this.
         #[napi]
         pub fn set_owner(&self, steam_id64: BigInt) -> Result<bool, Error> {
             let id = member_id(steam_id64)?;
@@ -291,7 +283,6 @@ pub mod matchmaking {
             })
         }
 
-        /// Change the lobby's visibility as its owner.
         #[napi]
         pub fn set_type(&self, lobby_type: LobbyType) -> Result<bool, Error> {
             let lobby_type = match lobby_type {
@@ -310,7 +301,6 @@ pub mod matchmaking {
             })
         }
 
-        /// Send a lobby invite without opening the overlay. Success does not mean the user joined.
         #[napi]
         pub fn invite_user(&self, steam_id64: BigInt) -> Result<bool, Error> {
             let id = member_id(steam_id64)?;
@@ -341,7 +331,6 @@ pub mod matchmaking {
             PlayerSteamId::from_steamid(client.matchmaking().lobby_owner(self.lobby_id))
         }
 
-        /// Set metadata for the local member, not for the lobby itself.
         #[napi]
         pub fn set_member_data(&self, key: String, value: String) -> Result<(), Error> {
             let key = lobby_key(key)?;
@@ -358,7 +347,6 @@ pub mod matchmaking {
             Ok(())
         }
 
-        /// Steam does not distinguish a missing member value from an empty one.
         #[napi]
         pub fn get_member_data(
             &self,
@@ -419,7 +407,6 @@ pub mod matchmaking {
             client.matchmaking().delete_lobby_data(self.lobby_id, &key)
         }
 
-        /// Get an object containing all the lobby data
         #[napi]
         pub fn get_full_data(&self) -> HashMap<String, String> {
             let client = crate::client::get_client();
@@ -438,8 +425,6 @@ pub mod matchmaking {
             data
         }
 
-        /// Merge current lobby data with provided data in a single batch
-        /// @returns true if all data was set successfully
         #[napi]
         pub fn merge_full_data(&self, data: HashMap<String, String>) -> bool {
             let matchmaking = crate::client::get_client().matchmaking();
@@ -501,7 +486,6 @@ pub mod matchmaking {
 
     #[napi]
     pub async fn get_lobbies(filter: Option<LobbyListFilter>) -> Result<Vec<Lobby>, Error> {
-        // RequestLobbyList cancels the preceding search if its callback hasn't fired yet.
         static SEARCH: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
         let _search = SEARCH.lock().await;
         let client = crate::client::get_client();

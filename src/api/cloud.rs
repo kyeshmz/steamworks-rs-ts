@@ -9,8 +9,6 @@ pub mod cloud {
     use std::io::Write;
     use steamworks::sys;
 
-    // The SDK uses ERemoteStoragePlatform as a bit mask. Combinations are not valid
-    // discriminants of the Rust enum in the pinned bindings. Use its u32 ABI.
     extern "C" {
         #[link_name = "SteamAPI_ISteamRemoteStorage_GetSyncPlatforms"]
         fn get_platform_mask(
@@ -41,8 +39,6 @@ pub mod cloud {
         with_storage(|storage| unsafe { get_platform_mask(storage, name.as_ptr()) })
     }
 
-    /// Combine Windows (1), macOS (2), PS3 (4), Linux (8), Switch (16),
-    /// Android (32) and iOS (64). Use 0 for none or 0xffffffff for all.
     #[napi]
     pub fn set_sync_platforms(name: String, mask: f64) -> Result<bool, Error> {
         check_name(&name)?;
@@ -73,7 +69,6 @@ pub mod cloud {
         })
     }
 
-    /// Hints to Steam that several writes belong together. This is not a transaction.
     #[napi]
     pub fn begin_file_write_batch() -> Result<bool, Error> {
         with_storage(|storage| unsafe {
@@ -81,7 +76,6 @@ pub mod cloud {
         })
     }
 
-    /// Call after all writes have settled, even if one failed.
     #[napi]
     pub fn end_file_write_batch() -> Result<bool, Error> {
         with_storage(|storage| unsafe {
@@ -183,7 +177,6 @@ pub mod cloud {
         file.timestamp()
     }
 
-    /// Read binary save data without blocking the Node event loop.
     #[napi]
     pub async fn read_file_bytes(name: String) -> Result<Buffer, Error> {
         check_name(&name)?;

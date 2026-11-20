@@ -460,9 +460,6 @@ pub mod workshop {
         };
     }
 
-    /// Subscribe to a workshop item. It will be downloaded and installed as soon as possible.
-    ///
-    /// {@link https://partner.steamgames.com/doc/api/ISteamUGC#SubscribeItem}
     #[napi]
     pub async fn subscribe(item_id: BigInt) -> Result<(), Error> {
         let client = crate::client::get_client();
@@ -481,9 +478,6 @@ pub mod workshop {
         }
     }
 
-    /// Unsubscribe from a workshop item. This will result in the item being removed after the game quits.
-    ///
-    /// {@link https://partner.steamgames.com/doc/api/ISteamUGC#UnsubscribeItem}
     #[napi]
     pub async fn unsubscribe(item_id: BigInt) -> Result<(), Error> {
         let client = crate::client::get_client();
@@ -502,13 +496,6 @@ pub mod workshop {
         }
     }
 
-    /// Gets the current state of a workshop item on this client. States can be combined.
-    ///
-    /// @returns a number with the current item state, e.g. 9
-    /// 9 = 1 (The current user is subscribed to this item) + 8 (The item needs an update)
-    ///
-    /// {@link https://partner.steamgames.com/doc/api/ISteamUGC#GetItemState}
-    /// {@link https://partner.steamgames.com/doc/api/ISteamUGC#EItemState}
     #[napi]
     pub fn state(item_id: BigInt) -> u32 {
         let client = crate::client::get_client();
@@ -519,11 +506,6 @@ pub mod workshop {
         result.bits()
     }
 
-    /// Gets info about currently installed content on the disc for workshop item.
-    ///
-    /// @returns an object with the the properties {folder, size_on_disk, timestamp}
-    ///
-    /// {@link https://partner.steamgames.com/doc/api/ISteamUGC#GetItemInstallInfo}
     #[napi]
     pub fn install_info(item_id: BigInt) -> Option<InstallInfo> {
         let client = crate::client::get_client();
@@ -541,11 +523,6 @@ pub mod workshop {
         }
     }
 
-    /// Get info about a pending download of a workshop item.
-    ///
-    /// @returns an object with the properties {current, total}
-    ///
-    /// {@link https://partner.steamgames.com/doc/api/ISteamUGC#GetItemDownloadInfo}
     #[napi]
     pub fn download_info(item_id: BigInt) -> Option<DownloadInfo> {
         let client = crate::client::get_client();
@@ -559,12 +536,6 @@ pub mod workshop {
         })
     }
 
-    /// Download or update a workshop item.
-    ///
-    /// @param highPriority - If high priority is true, start the download in high priority mode, pausing any existing in-progress Steam downloads and immediately begin downloading this workshop item.
-    /// @returns true or false
-    ///
-    /// {@link https://partner.steamgames.com/doc/api/ISteamUGC#DownloadItem}
     #[napi]
     pub fn download(item_id: BigInt, high_priority: bool) -> bool {
         let client = crate::client::get_client();
@@ -573,8 +544,6 @@ pub mod workshop {
             .download_item(PublishedFileId(item_id.get_u64().1), high_priority)
     }
 
-    /// Get all subscribed workshop items.
-    /// @returns an array of subscribed workshop item ids
     #[napi]
     pub fn get_subscribed_items() -> Vec<BigInt> {
         let client = crate::client::get_client();
@@ -586,8 +555,6 @@ pub mod workshop {
             .collect::<Vec<_>>()
     }
 
-    // Deletes an item
-    // @returns true or false
     #[napi]
     pub async fn delete_item(item_id: BigInt) -> Result<(), Error> {
         let client = crate::client::get_client();

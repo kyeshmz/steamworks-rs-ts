@@ -6,7 +6,7 @@
 
 Development here continues independently after upstream activity slowed and [users asked for a maintained fork](https://github.com/ceifa/steamworks.js/issues/199). This project has its own roadmap and package name, `@kyeshmz/steamworks.ts`. It is neither an official upstream successor nor a Valve product.
 
-[Package website](website/) · [API reference](client.d.ts) · [Issue tracker](https://github.com/kyeshmz/steamworks.ts/issues/1)
+[Package website](website/) · [API reference](client.d.ts) · [Issue tracker](https://github.com/kyeshmz/steamworks-rs-ts/issues/1)
 
 The [fork and issue audit](docs/coverage/README.md) compares implementations and lists remaining work. See [the fork feature guide](docs/fork-features.md) for the APIs available here and their verification status.
 
@@ -20,20 +20,21 @@ The [parity ledger](docs/coverage/parity.md) tracks donor features and remaining
 | [steamworks-ffi-node](https://github.com/ArtyProf/steamworks-ffi-node) | A TypeScript wrapper that calls the Steamworks SDK through Koffi FFI. Consider it if you want its manager-based API and can supply the SDK redistributables. |
 | [Greenworks](https://github.com/greenheartgames/greenworks) | A native plugin for integrating Steamworks with NW.js and Electron. Consider it when maintaining a game already built around Greenworks; check binary compatibility with your runtime version. |
 
+The [Koffi and Rust comparison](docs/koffi-vs-rust.md) explains when a TypeScript FFI binding is a better fit than this Rust addon.
+
 ## API
+
+Pass an app ID to `init`, or omit it and provide a `steam_appid.txt` file.
+The example prints the Steam username and activates an achievement.
 
 ```js
 const steamworks = require('@kyeshmz/steamworks.ts')
 
-// You can pass an appId, or don't pass anything and use a steam_appid.txt file
 const client = steamworks.init(480)
-
-// Print Steam username
 console.log(client.localplayer.getName())
 
-// Tries to activate an achievement
 if (client.achievement.activate('ACHIEVEMENT')) {
-    // ...
+    console.log('Achievement activated')
 }
 ```
 
@@ -41,13 +42,17 @@ See the [TypeScript declarations](client.d.ts) for supported calls and their sig
 
 ## Installation
 
-Until the first npm release, build a tarball for your platform from this checkout. Install the resulting `.tgz` in your game:
+Until the first npm release, build a tarball for your platform from this checkout:
 
 ```sh
 corepack pnpm install --frozen-lockfile
 corepack pnpm run build
 corepack pnpm pack
-# In your game directory:
+```
+
+Then install the resulting `.tgz` in your game directory:
+
+```sh
 pnpm add /path/to/kyeshmz-steamworks.ts-0.4.0.tgz
 ```
 
@@ -68,7 +73,7 @@ For the production build, copy the relevant distro files from `sdk/redistributab
 
 Use [Node.js](https://nodejs.org/en/) 22.13 or newer on the 22.x line, [Rust](https://www.rust-lang.org/tools/install), and a native toolchain for your platform. You need a signed-in [Steam](https://store.steampowered.com/about/) client to exercise live client APIs.
 
-From the repository root, run `corepack enable`, `pnpm install --frozen-lockfile`, and `pnpm run build:debug` to build the library.
+From the repository root, run `corepack enable`, `pnpm install --frozen-lockfile`, and `pnpm run build:debug` to build the library. The build regenerates `client.d.ts` from the Rust signatures. The root `index.d.ts` is checked in; update it when the root exports in `index.js` change.
 
 ### CI coverage
 
@@ -87,7 +92,7 @@ Other gates cover Rust formatting, Clippy and unit tests, strict TypeScript comp
 
 Use Conventional Commits (`fix:`, `feat:`, or `feat!:`). After CI passes on `main`, Release Please opens or updates a PR with the version and [changelog](CHANGELOG.md). Merging the release PR creates a GitHub release and publishes the tested tarball to npm.
 
-For the first publication, configure the repository secret `NPM_TOKEN` with publish access to `@kyeshmz/steamworks.ts`. After the package exists, configure npm trusted publishing for `kyeshmz/steamworks.ts`, workflow `publish.yml`, and remove the bootstrap token. A failed npm publication can be retried by dispatching the Publish workflow on the existing release tag.
+For the first publication, configure the repository secret `NPM_TOKEN` with publish access to `@kyeshmz/steamworks.ts`. After the package exists, configure npm trusted publishing for `kyeshmz/steamworks-rs-ts`, workflow `publish.yml`, and remove the bootstrap token. A failed npm publication can be retried by dispatching the Publish workflow on the existing release tag.
 
 ### Testing Electron
 

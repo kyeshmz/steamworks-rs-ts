@@ -47,7 +47,6 @@ pub mod networking_messages {
 
     fn peer(id: BigInt) -> Result<SteamId> {
         let (negative, raw, lossless) = id.get_u64();
-        // CSteamID individual account: universe, type, desktop instance, account number.
         if !negative
             && lossless
             && (1..=4).contains(&(raw >> 56))
@@ -61,7 +60,6 @@ pub mod networking_messages {
         }
     }
 
-    /// Queues a message and implicitly accepts a session from this peer. Success is not delivery.
     #[napi(strict)]
     pub fn send_message_to_user(
         steam_id64: BigInt,
@@ -91,7 +89,6 @@ pub mod networking_messages {
             .map_err(|err| Error::from_reason(format!("Failed to send Steam message: {err}")))
     }
 
-    /// Polls one channel (default 0) for up to 1–32 messages (default 10).
     #[napi(strict)]
     pub fn receive_messages_on_channel(
         channel: Option<f64>,
@@ -123,8 +120,6 @@ pub mod networking_messages {
         pub steam_id: Option<PlayerSteamId>,
     }
 
-    // Steam's manual dispatcher lends the payload only for this callback. Copy the
-    // identity, not steamworks-rs's SessionRequest guard (its Drop closes the peer).
     unsafe impl Callback for SessionRequest {
         const ID: i32 = sys::SteamNetworkingMessagesSessionRequest_t_k_iCallback as i32;
         const SIZE: i32 =
@@ -141,7 +136,6 @@ pub mod networking_messages {
         }
     }
 
-    /// Notifies without accepting. Omit the handler to stop listening.
     #[napi(strict)]
     pub fn set_session_request_handler(
         #[napi(ts_arg_type = "(request: SessionRequest) => void")] handler: Option<
@@ -174,14 +168,12 @@ pub mod networking_messages {
             if messages.is_null() {
                 return Err(Error::from_reason("Steam Networking Messages unavailable"));
             }
-            // The SDK defines a zeroed identity as Invalid; SetSteamID64 sets its type and size.
             let mut identity: sys::SteamNetworkingIdentity = std::mem::zeroed();
             sys::SteamAPI_SteamNetworkingIdentity_SetSteamID64(&mut identity, peer.raw());
             Ok(operation(messages, &identity))
         }
     }
 
-    /// Accept a known peer's pending request without sending a message.
     #[napi(strict)]
     pub fn accept_session_with_user(steam_id64: BigInt) -> Result<bool> {
         update_session(steam_id64, |messages, id| unsafe {
@@ -189,7 +181,6 @@ pub mod networking_messages {
         })
     }
 
-    /// Close the peer's session on all channels. This does not block future requests.
     #[napi(strict)]
     pub fn close_session_with_user(steam_id64: BigInt) -> Result<bool> {
         update_session(steam_id64, |messages, id| unsafe {
@@ -205,7 +196,6 @@ pub mod networking_messages {
         })
     }
 
-    /// Replaces the failure handler. Omit the handler to stop listening.
     #[napi]
     pub fn set_session_failed_handler(
         #[napi(ts_arg_type = "(failure: SessionFailure) => void")] handler: Option<

@@ -118,7 +118,6 @@ pub mod game_server {
             .parse()
             .map_err(|_| Error::new(Status::InvalidArg, "bindIp must be a dotted IPv4 address"))?;
         let game_port = number("gamePort", options.game_port, u16::MAX)?;
-        // 65535 enables shared-socket mode, which requires a packet forwarding API.
         let query_port = number("queryPort", options.query_port, u16::MAX - 1)?;
         if game_port == query_port {
             return Err(Error::new(
@@ -221,7 +220,6 @@ pub mod game_server {
         Ok(SteamId::from_raw(raw))
     }
 
-    /// Submit a remote peer's ticket. Wait for the validation event before granting access.
     #[napi(strict)]
     pub fn begin_auth_session(steam_id64: BigInt, ticket: Buffer) -> Result<()> {
         let peer = session_peer(steam_id64)?;
@@ -238,7 +236,6 @@ pub mod game_server {
         })
     }
 
-    /// End a session when its peer disconnects, validation fails, or you abandon it.
     #[napi(strict)]
     pub fn end_auth_session(steam_id64: BigInt) -> Result<()> {
         let peer = session_peer(steam_id64)?;
@@ -248,7 +245,6 @@ pub mod game_server {
         })
     }
 
-    /// The game server's ticket validation event. One listener; a later call replaces it.
     #[napi(strict)]
     pub fn on_validate_auth_ticket_response(
         #[napi(

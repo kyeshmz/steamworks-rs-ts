@@ -58,7 +58,6 @@ pub mod voice {
         Ok(available)
     }
 
-    /// Returns the compressed byte count without consuming any recorded samples.
     #[napi]
     pub fn get_available_voice() -> Result<u32> {
         available(user()?)

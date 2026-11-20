@@ -46,7 +46,6 @@ pub struct TicketValidation {
     pub response: u32,
 }
 
-// The pinned safe callback panics for SDK response 10 (network identity failure).
 unsafe impl steamworks::Callback for TicketValidation {
     const ID: i32 = sys::ValidateAuthTicketResponse_t_k_iCallback as i32;
     const SIZE: i32 = std::mem::size_of::<sys::ValidateAuthTicketResponse_t>() as i32;

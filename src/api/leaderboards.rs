@@ -1,4 +1,3 @@
-//! Adapted from steamworks.js PRs #208 (DavidBCD) and #198 (fixfell7).
 use napi_derive::napi;
 
 #[napi]
@@ -84,12 +83,9 @@ pub mod leaderboards {
 
     #[napi(object)]
     pub struct LeaderboardEntry {
-        /// SteamId64 of the entry's owner.
         pub steam_id: BigInt,
-        /// 1-indexed global rank.
         pub global_rank: i32,
         pub score: i32,
-        /// Game-defined metadata attached at upload (up to 64 i32s).
         pub details: Vec<i32>,
     }
 
@@ -153,7 +149,6 @@ pub mod leaderboards {
             .ok_or_else(|| Error::from_reason("Leaderboard not found"))
     }
 
-    /// Resolves to false for a missing board; Steam transport errors reject.
     #[napi]
     pub async fn find_leaderboard(name: String) -> Result<bool, Error> {
         validate_name(&name)?;
@@ -162,7 +157,6 @@ pub mod leaderboards {
             .is_some())
     }
 
-    /// Sort and display are only applied when Steam creates the board.
     #[napi]
     pub async fn find_or_create_leaderboard(
         name: String,
@@ -179,7 +173,6 @@ pub mod leaderboards {
         .is_some())
     }
 
-    /// Creates the board if missing. Existing boards keep their configuration.
     #[napi]
     pub async fn upload_leaderboard_score(
         name: String,
@@ -221,7 +214,6 @@ pub mod leaderboards {
         })
     }
 
-    /// Global ranks start at 1. Around-user offsets may be negative. Friends ignores the range.
     #[napi]
     pub async fn download_leaderboard_entries(
         name: String,
@@ -244,8 +236,6 @@ pub mod leaderboards {
         let client = crate::client::get_client();
         let board = existing(&client, &name).await?;
         let (tx, rx) = oneshot::channel();
-        // The pinned wrapper casts usize back to Steam's signed i32 offsets.
-        // Reserve all 64 details: it sets Vec length from Steam's available count.
         client.user_stats().download_leaderboard_entries(
             &board,
             request.into(),

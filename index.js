@@ -1,7 +1,5 @@
 const { platform, arch } = process
 
-/** @typedef {typeof import('./client.d')} Client */
-/** @type {Client} */
 let nativeBinding = undefined
 
 if (platform === 'win32' && arch === 'x64') {
@@ -18,14 +16,8 @@ if (platform === 'win32' && arch === 'x64') {
 
 let runCallbacksInterval = undefined
 
-/** Whether this process has successfully initialized the Steam client. */
 module.exports.isInitialized = () => nativeBinding.isInitialized()
 
-/**
- * Initialize the steam client or throw an error if it fails
- * @param {number} [appId] - App ID of the game to load, if undefined, will search for a steam_appid.txt file
- * @returns {Omit<Client, 'init' | 'runCallbacks' | 'restartAppIfNecessary' | 'game_server'>}
-*/
 module.exports.init = (appId) => {
     const { init: internalInit, runCallbacks, restartAppIfNecessary, game_server, ...api } = nativeBinding
 
@@ -37,17 +29,8 @@ module.exports.init = (appId) => {
     return api
 }
 
-/**
- * @param {number} appId - App ID of the game to load
- * {@link https://partner.steamgames.com/doc/api/steam_api#SteamAPI_RestartAppIfNecessary}
- * @returns {boolean} 
- */
 module.exports.restartAppIfNecessary = (appId) => nativeBinding.restartAppIfNecessary(appId);
 
-/**
- * Enable the steam overlay on electron
- * @param {boolean} [disableEachFrameInvalidation] - Should attach a single pixel to be rendered each frame
-*/
 module.exports.electronEnableSteamOverlay = (disableEachFrameInvalidation) => {
     const electron = require('electron')
     if (!electron) {
@@ -58,7 +41,6 @@ module.exports.electronEnableSteamOverlay = (disableEachFrameInvalidation) => {
     electron.app.commandLine.appendSwitch('disable-direct-composition')
 
     if (!disableEachFrameInvalidation) {
-        /** @param {electron.BrowserWindow} browserWindow */
         const attachFrameInvalidator = (browserWindow) => {
             browserWindow.steamworksRepaintInterval = setInterval(() => {
                 if (browserWindow.isDestroyed()) {
@@ -76,6 +58,5 @@ module.exports.electronEnableSteamOverlay = (disableEachFrameInvalidation) => {
 
 const SteamCallback = nativeBinding.callback.SteamCallback
 module.exports.SteamCallback = SteamCallback
-/** @type {Client['game_server']} */
 const gameServer = nativeBinding.game_server
 module.exports.gameServer = gameServer

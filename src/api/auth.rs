@@ -16,9 +16,6 @@ pub mod auth {
     const MAX_APP_DATA: usize = 128;
     const TICKET_BUFFER: usize = 1024;
 
-    // Steam allows one pending EncryptedAppTicketResponse_t per user. Serializing keeps
-    // concurrent callers from reading each other's ticket out of the shared
-    // GetEncryptedAppTicket buffer.
     lazy_static! {
         static ref ENCRYPTED_TICKET_SLOT: Mutex<()> = Mutex::new(());
     }
@@ -51,7 +48,6 @@ pub mod auth {
         Ok(SteamId::from_raw(raw))
     }
 
-    /// Submit a remote peer's ticket. Wait for ValidateAuthTicketResponse before granting access.
     #[napi(strict)]
     pub fn begin_auth_session(steam_id64: BigInt, ticket: Buffer) -> Result<(), Error> {
         let peer = session_peer(steam_id64)?;
@@ -66,7 +62,6 @@ pub mod auth {
             .map_err(|error| Error::from_reason(error.to_string()))
     }
 
-    /// End an accepted submission when the peer disconnects or validation fails.
     #[napi(strict)]
     pub fn end_auth_session(steam_id64: BigInt) -> Result<(), Error> {
         let peer = session_peer(steam_id64)?;
@@ -96,8 +91,6 @@ pub mod auth {
         }
     }
 
-    /// @param steamId64 - The user steam id or game server steam id. Use as NetworkIdentity of the remote system that will authenticate the ticket. If it is peer-to-peer then the user steam ID. If it is a game server, then the game server steam ID may be used if it was obtained from a trusted 3rd party
-    /// @param timeoutSeconds - The number of seconds to wait for the ticket to be validated. Default value is 10 seconds.
     #[napi]
     pub async fn get_session_ticket_with_steam_id(
         steam_id64: BigInt,
@@ -110,8 +103,6 @@ pub mod auth {
         .await
     }
 
-    /// @param ip - The string of IPv4 or IPv6 address. Use as NetworkIdentity of the remote system that will authenticate the ticket.
-    /// @param timeoutSeconds - The number of seconds to wait for the ticket to be validated. Default value is 10 seconds.
     #[napi]
     pub async fn get_session_ticket_with_ip(
         ip: String,
@@ -123,8 +114,6 @@ pub mod auth {
         }
     }
 
-    /// @param networkIdentity - The identity of the remote system that will authenticate the ticket. If it is peer-to-peer then the user steam ID. If it is a game server, then the game server steam ID may be used if it was obtained from a trusted 3rd party, otherwise use the IP address. If it is a service, a string identifier of that service if one if provided.
-    /// @param timeoutSeconds - The number of seconds to wait for the ticket to be validated. Default value is 10 seconds.
     async fn get_session_ticket(
         network_identity: NetworkingIdentity,
         timeout_seconds: Option<u32>,
@@ -297,12 +286,6 @@ pub mod auth {
         Ok(buffer.into())
     }
 
-    /// Request an encrypted app ticket and resolve with its bytes. Unlike a session
-    /// ticket this is issued for your backend to decrypt with the app's encrypted
-    /// ticket key, never for beginAuthSession.
-    ///
-    /// @param dataToInclude - Optional application data encrypted into the ticket, at most 128 bytes.
-    /// @param timeoutSeconds - The number of seconds to wait for Steam to complete the request. Default value is 10 seconds.
     #[napi(ts_return_type = "Promise<Buffer>")]
     pub fn request_encrypted_app_ticket(
         env: &Env,

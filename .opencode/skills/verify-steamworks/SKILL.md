@@ -4,7 +4,7 @@ description: Verify the steamworks.js Node addon, native exports and consumer de
 ---
 
 ## Launch
-At the repository root run `corepack pnpm install --frozen-lockfile` then `corepack pnpm run build:debug`. This generates declarations and the host addon under `dist`. Builds in one checkout share those files.
+At the repository root run `corepack pnpm install --frozen-lockfile` then `corepack pnpm run build:debug`. This builds the host addon and regenerates `client.d.ts` under `dist`. The root `index.d.ts` is checked in; update it when the root exports in `index.js` change. Builds in one checkout share those files.
 
 ## Doctor
 Use `node -p "process.platform + '/' + process.arch"` and `node -e "require('.')"` to check the host and loader. Loading the addon does not initialize Steam.

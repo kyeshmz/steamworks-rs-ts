@@ -55,6 +55,3 @@ const params = [
 ]
 
 child_process.execFileSync(process.execPath, [packageBin('@napi-rs/cli', 'napi'), ...params], { stdio: 'inherit' })
-child_process.execFileSync(process.execPath, [
-    packageBin('typescript', 'tsc'), 'index.js', '--allowJs', '--declaration', '--emitDeclarationOnly'
-], { stdio: 'inherit' })

@@ -1,6 +1,6 @@
 # Implementing the six confirmed parity gaps
 
-Baseline: [`0e77809`](https://github.com/kyeshmz/steamworks.ts/commit/0e77809491c31b42263ee730afd847416544b828). The [ledger](parity-ledger.md) distinguishes confirmed gaps from operations still awaiting semantic review. This plan covers the confirmed gaps only.
+Baseline: [`0e77809`](https://github.com/kyeshmz/steamworks-rs-ts/commit/0e77809491c31b42263ee730afd847416544b828). The [ledger](parity-ledger.md) distinguishes confirmed gaps from operations still awaiting semantic review. This plan covers the confirmed gaps only.
 
 | Work package | Deliverable | Acceptance evidence |
 |---|---|---|

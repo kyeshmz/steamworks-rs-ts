@@ -17,7 +17,6 @@ lazy_static! {
 }
 
 pub(crate) fn dispatch() {
-    // All Node workers share Steam's manual-dispatch pipe and its last callback buffer.
     if let Ok(mut pump) = PUMP.try_lock() {
         let start = Instant::now();
         crate::client::get_client().run_callbacks();
@@ -47,7 +46,6 @@ pub mod runtime {
         pub max_run_us: f64,
     }
 
-    /// Timing of completed Steam callback pumps. A reset starts a fresh measurement window.
     #[napi]
     pub fn pump_stats(reset: Option<bool>) -> PumpStats {
         let mut p = super::PUMP.lock().unwrap();
