@@ -326,12 +326,12 @@ jobs:
             - uses: actions/download-artifact@v8
               with:
                   name: npm-package
-                  path: ${{ runner.temp }}/candidate
+                  path: candidate
             - shell: bash
               env:
                   EXPECTED_ARCH: ${{ matrix.process }}
               run: |
-                  tar -xzf "$RUNNER_TEMP"/candidate/*.tgz
+                  tar -xzf candidate/*.tgz
                   node -e "const a=require('node:assert/strict'); a.equal(process.platform,'win32'); a.equal(process.arch,process.env.EXPECTED_ARCH); a.throws(()=>require('./package'),{message:'Unsupported OS: win32, architecture: '+process.arch}); console.log('Explicit unsupported-process error verified for',process.arch)"
 
     compatibility:
