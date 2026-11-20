@@ -26,12 +26,32 @@ test -s "$scratch/package/dist/linux64/libsteam_api.so"
 echo "Tarball $(sha256sum "$tarball")"
 echo "Extracted package $scratch/package"
 
+runtime_image=$(docker build --quiet --platform linux/amd64 --build-arg "BASE_IMAGE=$image" - <<'EOF'
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+RUN set -eu; \
+    if ldconfig -p | grep -q 'libatomic.so.1'; then \
+        echo 'libatomic already available'; \
+    else \
+        . /etc/os-release; \
+        case "$ID" in \
+            debian|ubuntu) apt-get update && apt-get install -y --no-install-recommends libatomic1 ;; \
+            fedora|rocky) dnf install -y libatomic ;; \
+            arch) pacman -Sy --noconfirm --needed libatomic ;; \
+            *) echo "Unsupported distro ID: $ID" >&2; exit 1 ;; \
+        esac; \
+    fi; \
+    ldconfig -p | grep 'libatomic.so.1'
+EOF
+)
+echo "Runtime image $runtime_image"
+
 docker run --rm --network none --platform linux/amd64 \
     --mount "type=bind,src=$node,dst=/ci-node,readonly" \
     --mount "type=bind,src=$scratch/package,dst=/ci-package,readonly" \
     --mount "type=bind,src=$root/test/package-smoke.js,dst=/ci-package-smoke.js,readonly" \
     --mount "type=bind,src=$root/test/networking-sockets.js,dst=/ci-networking-sockets.js,readonly" \
-    --entrypoint /bin/sh "$image" -eu -c '
+    --entrypoint /bin/sh "$runtime_image" -eu -c '
         ulimit -c 0
         . /etc/os-release
         cat /etc/os-release
@@ -47,6 +67,7 @@ docker run --rm --network none --platform linux/amd64 \
             esac
         fi
         test "$(uname -m)" = x86_64 || { echo "Expected x86_64" >&2; exit 1; }
+        ldconfig -p | grep "libatomic.so.1"
         /ci-node -e "
             const assert = require(\"node:assert/strict\")
             assert.equal(process.platform, \"linux\")

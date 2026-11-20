@@ -173,11 +173,21 @@ jobs:
             - run: pnpm install --frozen-lockfile
             - run: pnpm --dir test/typescript run compile
             - run: node test/overlay-lifecycle.cjs
-            - name: Pack and verify the release payload
+            - name: Pack the release candidate
+              if: github.event_name != 'workflow_dispatch' || !startsWith(github.ref, 'refs/tags/v')
+              run: pnpm pack --pack-destination "$RUNNER_TEMP/candidate"
+            - name: Use the existing release asset for a publication retry
+              if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG: ${{ github.ref_name }}
+              run: gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.tgz' --dir "$RUNNER_TEMP/candidate"
+            - name: Verify the release payload
               run: |
-                  pnpm pack --pack-destination "$RUNNER_TEMP"
+                  set -- "$RUNNER_TEMP"/candidate/*.tgz
+                  test "$#" = 1 && test -s "$1"
                   mkdir "$RUNNER_TEMP/packed"
-                  tar -xzf "$RUNNER_TEMP"/*.tgz -C "$RUNNER_TEMP/packed"
+                  tar -xzf "$1" -C "$RUNNER_TEMP/packed"
                   cd "$RUNNER_TEMP/packed/package"
                   for file in CHANGELOG.md index.js index.d.ts client.d.ts callbacks.d.ts \
                     dist/linux64/{steamworksjs.linux-x64-gnu.node,libsteam_api.so} \
@@ -189,13 +199,13 @@ jobs:
                   mkdir "$RUNNER_TEMP/consumer"
                   cd "$RUNNER_TEMP/consumer"
                   echo '{"private":true}' > package.json
-                  pnpm add "$RUNNER_TEMP"/*.tgz
+                  pnpm add "$1"
                   cp "$GITHUB_WORKSPACE/test/typescript/index.ts" .
                   "$GITHUB_WORKSPACE/node_modules/.bin/tsc" --strict --noEmit index.ts
             - uses: actions/upload-artifact@v7
               with:
                   name: npm-package
-                  path: ${{ runner.temp }}/*.tgz
+                  path: ${{ runner.temp }}/candidate/*.tgz
                   if-no-files-found: error
 
     verify-package:
@@ -360,13 +370,17 @@ jobs:
               with:
                   node-version: 24.x
                   registry-url: https://registry.npmjs.org
+            - uses: actions/download-artifact@v8
+              with:
+                  name: npm-package
             - name: Publish verified tarball
               env:
                   TAG: ${{ needs.release.outputs.tag || github.ref_name }}
                   GH_TOKEN: ${{ github.token }}
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
               run: |
-                  gh release download "$TAG" --pattern '*.tgz' --repo "$GITHUB_REPOSITORY"
+                  gh release download "$TAG" --pattern '*.tgz' --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/release"
+                  cmp ./*.tgz "$RUNNER_TEMP"/release/*.tgz
                   tar -xOzf ./*.tgz package/package.json > manifest.json
                   node -e "const p = require('./manifest.json'); if (p.name !== '@kyeshmz/steamworks.ts' || 'v' + p.version !== process.env.TAG) process.exit(1)"
                   status=$(curl --silent --show-error -o registry.json -w '%{http_code}' \
