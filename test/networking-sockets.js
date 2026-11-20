@@ -5,6 +5,7 @@ const binary = process.argv[2] || {
     'darwin-arm64': 'dist/osx/steamworksjs.darwin-arm64.node',
     'darwin-x64': 'dist/osx/steamworksjs.darwin-x64.node',
     'linux-x64': 'dist/linux64/steamworksjs.linux-x64-gnu.node',
+    'linux-arm64': 'dist/linuxarm64/steamworksjs.linux-arm64-gnu.node',
     'win32-x64': 'dist/win64/steamworksjs.win32-x64-msvc.node',
 }[`${process.platform}-${process.arch}`]
 const sockets = require(path.resolve(binary)).networking_sockets

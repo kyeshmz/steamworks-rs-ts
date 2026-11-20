@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict')
 const path = require('node:path')
-const native = require(path.resolve('dist/linux64/steamworksjs.linux-x64-gnu.node'))
+const platform = process.arch === 'arm64' ? 'linuxarm64' : 'linux64'
+const native = require(path.resolve(`dist/${platform}/steamworksjs.linux-${process.arch}-gnu.node`))
 const sockets = native.networking_sockets
 const net = native.networking
 const messages = native.networking_messages

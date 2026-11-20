@@ -6,6 +6,7 @@ if (process.argv[2] === '--inspect') {
     const base = path.resolve(process.argv[3])
     const binary = {
         'linux-x64': 'linux64/steamworksjs.linux-x64-gnu.node',
+        'linux-arm64': 'linuxarm64/steamworksjs.linux-arm64-gnu.node',
         'win32-x64': 'win64/steamworksjs.win32-x64-msvc.node',
         'darwin-x64': 'osx/steamworksjs.darwin-x64.node',
         'darwin-arm64': 'osx/steamworksjs.darwin-arm64.node',

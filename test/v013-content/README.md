@@ -1,6 +1,6 @@
 # Steamworks 0.13 content fixture
 
-After `pnpm run build:debug`, run `sh test/v013-content/run.sh` on Linux x64. Run `sh test/v013-content/run.sh timeout` to withhold cloud share, item creation, and detailed query callbacks and check their 30-second timeouts. The fixture replaces the Steam SDK library in an isolated package under `target/v013-content`. It does not initialize the live Steam client.
+After `pnpm run build:debug`, run `sh test/v013-content/run.sh` on native Linux x64 or ARM64. Run `sh test/v013-content/run.sh timeout` to withhold cloud share, item creation, and detailed query callbacks and check their 30-second timeouts. The fixture replaces the Steam SDK library in an isolated package under `target/v013-content`. It does not initialize the live Steam client.
 
 The fixture exercises workshop update language, subscribed item filtering and a shorter result count, playtime tracking success and failure, deletion failure, download suspension, cloud platform masks, cloud sharing and forgetting, lobby game server data, combined lobby filters, detailed item calls with `onlyIds`, all-item and user ID queries, and all-item total queries. It checks large 64-bit IDs and invalid inputs.
 

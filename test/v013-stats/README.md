@@ -6,4 +6,4 @@
 
 `achievement.getIconRgba(name)` returns `{ width, height, rgba }` with four bytes per pixel or `null` when the icon is unavailable, invalid, or exceeds 16 MiB. `getIcon` remains unchanged.
 
-Run `sh test/v013-stats/run.sh` after `pnpm run build:debug` on Linux x64. This isolated SDK fixture uses the addon's regular callback pump and does not connect to Steam. It exercises reversed global call completions, I/O failure, an SDK operation error that the crate discards, timeout, user-stat reads, and RGBA bounds.
+Run `sh test/v013-stats/run.sh` after `pnpm run build:debug` on native Linux x64 or ARM64. This isolated SDK fixture uses the addon's regular callback pump and does not connect to Steam. It exercises reversed global call completions, I/O failure, an SDK operation error that the crate discards, timeout, user-stat reads, and RGBA bounds.

@@ -1,6 +1,6 @@
 # Callback fixture
 
-Run `sh test/v013-callbacks/run.sh` after `pnpm run build:debug`. The fixture replaces the Steam SDK with an offline Linux x64 implementation.
+Run `sh test/v013-callbacks/run.sh` after `pnpm run build:debug` on native Linux x64 or ARM64. The SDK stand-in is compiled for the host CPU. The published 0.4.0 comparison below requires x64.
 
 To check a previously built 0.4.0 package in a separate Node process, run `BASELINE_PACKAGE=/absolute/path/to/package sh test/v013-callbacks/run.sh`. The addon must be built against Steamworks 0.11. The script copies its loader and addon into this checkout's fixture directory and checks the same legacy callback payloads without starting Steam.
 

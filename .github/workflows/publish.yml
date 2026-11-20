@@ -36,8 +36,14 @@ jobs:
               run: cargo test --locked --lib
 
     build:
-        name: Build Linux x64 (glibc 2.31)
-        runs-on: ubuntu-latest
+        name: Build Linux ${{ matrix.arch }} (glibc 2.31)
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - { os: ubuntu-22.04, arch: x64, target: x86_64-unknown-linux-gnu, folder: linux64 }
+                    - { os: ubuntu-22.04-arm, arch: arm64, target: aarch64-unknown-linux-gnu, folder: linuxarm64 }
+        runs-on: ${{ matrix.os }}
 
         container:
             image: ubuntu:20.04
@@ -58,7 +64,7 @@ jobs:
               uses: dtolnay/rust-toolchain@stable
               with:
                   toolchain: stable
-                  targets: x86_64-unknown-linux-gnu
+                  targets: ${{ matrix.target }}
 
             - uses: Swatinem/rust-cache@v2
 
@@ -68,17 +74,20 @@ jobs:
             - name: Build Linux
               run: |
                   rm client.d.ts
-                  pnpm run build --target x86_64-unknown-linux-gnu
+                  test "$(node -p process.arch)" = "${{ matrix.arch }}"
+                  pnpm run build --target "${{ matrix.target }}"
                   test -s client.d.ts && test -s index.d.ts
 
             - name: Check 0.13 contracts against the Linux release addon
               run: |
                   pnpm exec tsc --strict --noEmit --target es2020 --module node16 --types node test/v013-*/*.ts test/game-server-fixture/types.ts
                   pnpm run test:steamworks-013
-                  sh test/game-server-fixture/run.sh dist/linux64/steamworksjs.linux-x64-gnu.node
-                  sh test/inventory-fixture/run.sh dist/linux64/steamworksjs.linux-x64-gnu.node
+                  binary="dist/${{ matrix.folder }}/steamworksjs.linux-${{ matrix.arch }}-gnu.node"
+                  sh test/game-server-fixture/run.sh "$binary"
+                  sh test/inventory-fixture/run.sh "$binary"
 
             - uses: actions/upload-artifact@v7
+              if: matrix.arch == 'x64'
               with:
                   name: declarations
                   path: '*.d.ts'
@@ -87,7 +96,7 @@ jobs:
             - name: Upload artifact
               uses: actions/upload-artifact@v7
               with:
-                  name: binaries-linux
+                  name: binaries-linux-${{ matrix.arch }}
                   path: dist
                   if-no-files-found: error
 
@@ -190,7 +199,8 @@ jobs:
                   tar -xzf "$1" -C "$RUNNER_TEMP/packed"
                   cd "$RUNNER_TEMP/packed/package"
                   for file in CHANGELOG.md index.js index.d.ts client.d.ts callbacks.d.ts \
-                    dist/linux64/{steamworksjs.linux-x64-gnu.node,libsteam_api.so} \
+                     dist/linux64/{steamworksjs.linux-x64-gnu.node,libsteam_api.so} \
+                     dist/linuxarm64/{steamworksjs.linux-arm64-gnu.node,libsteam_api.so} \
                     dist/win64/{steamworksjs.win32-x64-msvc.node,steam_api64.dll} \
                     dist/osx/{steamworksjs.darwin-x64.node,steamworksjs.darwin-arm64.node,libsteam_api.dylib}; do
                       test -s "$file" || { echo "Missing $file"; exit 1; }
@@ -209,32 +219,31 @@ jobs:
                   if-no-files-found: error
 
     verify-package:
-        name: Packed addon / ${{ matrix.os }} / ${{ matrix.arch }} / Node ${{ matrix.node }}
+        name: Packed addon / ${{ matrix.cpu.name }} / Node ${{ matrix.node }}
         needs: package
         timeout-minutes: 20
         strategy:
             fail-fast: false
             matrix:
                 node: [22, 24, 26]
-                os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, windows-2022, windows-2025, macos-15, macos-15-intel, macos-26, macos-26-intel]
-                include:
-                    - { os: ubuntu-22.04, platform: linux, arch: x64 }
-                    - { os: ubuntu-24.04, platform: linux, arch: x64 }
-                    - { os: ubuntu-26.04, platform: linux, arch: x64 }
-                    - { os: windows-2022, platform: win32, arch: x64 }
-                    - { os: windows-2025, platform: win32, arch: x64 }
-                    - { os: macos-15, platform: darwin, arch: arm64 }
-                    - { os: macos-15-intel, platform: darwin, arch: x64 }
-                    - { os: macos-26, platform: darwin, arch: arm64 }
-                    - { os: macos-26-intel, platform: darwin, arch: x64 }
-        runs-on: ${{ matrix.os }}
+                cpu:
+                    - { name: Linux x64, os: ubuntu-22.04, host: X64, platform: linux, arch: x64 }
+                    - { name: Linux ARM64, os: ubuntu-22.04-arm, host: ARM64, platform: linux, arch: arm64 }
+                    - { name: macOS Intel, os: macos-15-intel, host: X64, platform: darwin, arch: x64 }
+                    - { name: macOS Apple Silicon, os: macos-15, host: ARM64, platform: darwin, arch: arm64 }
+                    - { name: macOS x64 on Apple Silicon (Rosetta), os: macos-15, host: ARM64, platform: darwin, arch: x64 }
+                    - { name: Windows x64, os: windows-2022, host: X64, platform: win32, arch: x64 }
+                    - { name: Windows x64 on ARM64 (emulated), os: windows-11-arm, host: ARM64, platform: win32, arch: x64 }
+        runs-on: ${{ matrix.cpu.os }}
+        env:
+            npm_config_arch: ${{ matrix.cpu.arch }}
         steps:
             - uses: actions/checkout@v4
             - uses: pnpm/action-setup@v6
             - uses: actions/setup-node@v7
               with:
                   node-version: ${{ matrix.node }}
-                  architecture: ${{ matrix.arch }}
+                  architecture: ${{ matrix.cpu.arch }}
             - run: pnpm install --frozen-lockfile
             - uses: actions/download-artifact@v8
               with:
@@ -242,11 +251,15 @@ jobs:
             - name: Install under steamworks.js and check its native API
               shell: bash
               env:
-                  EXPECTED_PLATFORM: ${{ matrix.platform }}
-                  EXPECTED_ARCH: ${{ matrix.arch }}
+                  HOST_CPU: ${{ runner.arch }}
+                  EXPECTED_HOST_CPU: ${{ matrix.cpu.host }}
+                  EXPECTED_PLATFORM: ${{ matrix.cpu.platform }}
+                  EXPECTED_ARCH: ${{ matrix.cpu.arch }}
                   EXPECTED_NODE: ${{ matrix.node }}
               run: |
-                  node -e "const a=require('node:assert/strict'); a.equal(process.platform,process.env.EXPECTED_PLATFORM); a.equal(process.arch,process.env.EXPECTED_ARCH); a.equal(process.versions.node.split('.')[0],process.env.EXPECTED_NODE); console.log(process.version, process.platform, process.arch)"
+                  test "$HOST_CPU" = "$EXPECTED_HOST_CPU"
+                  echo "Runner: $RUNNER_OS $HOST_CPU; Node process: $EXPECTED_ARCH"
+                  node -e "const a=require('node:assert/strict'); a.equal(process.platform,process.env.EXPECTED_PLATFORM); a.equal(process.arch,process.env.EXPECTED_ARCH); a.equal(process.versions.node.split('.')[0],process.env.EXPECTED_NODE); console.log(process.version, process.platform, process.arch, require('node:os').cpus()[0].model)"
                   consumer="$RUNNER_TEMP/deviation-consumer"
                   mkdir -p "$consumer"
                   cp ./*.tgz "$consumer/steamworks.tgz"
@@ -259,7 +272,7 @@ jobs:
                   node "$GITHUB_WORKSPACE/test/package-smoke.js" node_modules/steamworks.js
                   (cd node_modules/steamworks.js && node "$GITHUB_WORKSPACE/test/networking-sockets.js")
             - name: Compare the published 0.4.0 game dependency and ticket behavior
-              if: matrix.os == 'ubuntu-24.04' && matrix.node == 22
+              if: matrix.cpu.platform == 'linux' && matrix.cpu.arch == 'x64' && matrix.node == 22
               shell: bash
               run: |
                   reference="$RUNNER_TEMP/reference-consumer"
@@ -276,10 +289,13 @@ jobs:
               if: matrix.node == 22
               shell: bash
               env:
-                  EXPECTED_PLATFORM: ${{ matrix.platform }}
-                  EXPECTED_ARCH: ${{ matrix.arch }}
+                  EXPECTED_PLATFORM: ${{ matrix.cpu.platform }}
+                  EXPECTED_ARCH: ${{ matrix.cpu.arch }}
               run: |
                   if [[ "$RUNNER_OS" == Linux ]]; then
+                      sudo apt-get update -qq
+                      sudo apt-get install -y xvfb xauth libgtk-3-0 libnss3 libasound2 libgbm1
+                      pnpm exec install-electron
                       helper=/opt/google/chrome/chrome-sandbox
                       if [[ -u "$helper" && "$(stat -c %u "$helper")" == 0 ]]; then
                           ln -sf "$helper" "$(node -p "require('node:path').dirname(require('electron'))")/chrome-sandbox"
@@ -289,48 +305,43 @@ jobs:
                       pnpm exec electron test/electron-package-smoke.cjs "$RUNNER_TEMP/deviation-consumer" --mute-audio
                   fi
 
-    linux-distros:
-        name: Packed addon / ${{ matrix.distro.image }} / x64 / Node ${{ matrix.node }}
+    unsupported-windows-process:
+        name: Unsupported process guard / Windows ${{ matrix.process }}
         needs: package
-        runs-on: ubuntu-24.04
-        timeout-minutes: 12
+        runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
             matrix:
-                node: [22, 24, 26]
-                distro:
-                    - { image: 'debian:bookworm-slim', id: debian, version: '12' }
-                    - { image: 'debian:trixie-slim', id: debian, version: '13' }
-                    - { image: 'fedora:44', id: fedora, version: '44' }
-                    - { image: 'rockylinux/rockylinux:9', id: rocky, version: '9' }
-                    - { image: 'archlinux:base', id: arch, version: '-' }
+                include:
+                    - { os: windows-11-arm, setup: arm64, process: arm64 }
+                    - { os: windows-2022, setup: x86, process: ia32 }
         steps:
-            - uses: actions/checkout@v4
             - uses: actions/setup-node@v7
               with:
-                  node-version: ${{ matrix.node }}
+                  node-version: 22
+                  architecture: ${{ matrix.setup }}
                   package-manager-cache: false
             - uses: actions/download-artifact@v8
               with:
                   name: npm-package
                   path: ${{ runner.temp }}/candidate
-            - run: sh test/ci-linux-distro.sh "$RUNNER_TEMP"/candidate/*.tgz "$IMAGE" "$DISTRO" "$VERSION" "$NODE_MAJOR"
+            - shell: bash
               env:
-                  IMAGE: ${{ matrix.distro.image }}
-                  DISTRO: ${{ matrix.distro.id }}
-                  VERSION: ${{ matrix.distro.version }}
-                  NODE_MAJOR: ${{ matrix.node }}
+                  EXPECTED_ARCH: ${{ matrix.process }}
+              run: |
+                  tar -xzf "$RUNNER_TEMP"/candidate/*.tgz
+                  node -e "const a=require('node:assert/strict'); a.equal(process.platform,'win32'); a.equal(process.arch,process.env.EXPECTED_ARCH); a.throws(()=>require('./package'),{message:'Unsupported OS: win32, architecture: '+process.arch}); console.log('Explicit unsupported-process error verified for',process.arch)"
 
     compatibility:
         name: Platform compatibility
         if: always()
-        needs: [verify-package, linux-distros]
+        needs: [verify-package, unsupported-windows-process]
         runs-on: ubuntu-latest
         steps:
-            - run: test "$HOSTS" = success && test "$DISTROS" = success
+            - run: test "$HOSTS" = success && test "$GUARDS" = success
               env:
                   HOSTS: ${{ needs.verify-package.result }}
-                  DISTROS: ${{ needs.linux-distros.result }}
+                  GUARDS: ${{ needs.unsupported-windows-process.result }}
 
     release:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

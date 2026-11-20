@@ -6,6 +6,8 @@ if (platform === 'win32' && arch === 'x64') {
     nativeBinding = require('./dist/win64/steamworksjs.win32-x64-msvc.node')
 } else if (platform === 'linux' && arch === 'x64') {
     nativeBinding = require('./dist/linux64/steamworksjs.linux-x64-gnu.node')
+} else if (platform === 'linux' && arch === 'arm64') {
+    nativeBinding = require('./dist/linuxarm64/steamworksjs.linux-arm64-gnu.node')
 } else if (platform === 'darwin' && arch === 'x64') {
     nativeBinding = require('./dist/osx/steamworksjs.darwin-x64.node')
 } else if (platform === 'darwin' && arch === 'arm64') {

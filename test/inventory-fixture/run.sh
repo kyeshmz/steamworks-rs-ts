@@ -3,9 +3,10 @@ set -eu
 cd "$(dirname "$0")/../.."
 if [ "$#" = 0 ]; then cargo build --locked --offline; fi
 root=target/inventory-fixture
-case "$(uname -s):$(uname -m)" in
-    Darwin:*) platform=osx; library=libsteam_api.dylib; binary=libsteamworksjs.dylib; addon=steamworksjs.darwin-$(node -p process.arch).node ;;
-    Linux:x86_64) platform=linux64; library=libsteam_api.so; binary=libsteamworksjs.so; addon=steamworksjs.linux-x64-gnu.node ;;
+case "$(uname -s):$(uname -m):$(node -p process.arch)" in
+    Darwin:*:*) platform=osx; library=libsteam_api.dylib; binary=libsteamworksjs.dylib; addon=steamworksjs.darwin-$(node -p process.arch).node ;;
+    Linux:x86_64:x64) platform=linux64; library=libsteam_api.so; binary=libsteamworksjs.so; addon=steamworksjs.linux-x64-gnu.node ;;
+    Linux:aarch64:arm64) platform=linuxarm64; library=libsteam_api.so; binary=libsteamworksjs.so; addon=steamworksjs.linux-arm64-gnu.node ;;
     *) echo "Unsupported inventory fixture host" >&2; exit 1 ;;
 esac
 dist=$root/dist/$platform

@@ -82,18 +82,19 @@ From the repository root, run `corepack enable`, `pnpm install --frozen-lockfile
 
 ### CI coverage
 
-Open [public Platform CI runs](https://github.com/kyeshmz/steamworks-rs-ts/actions/workflows/publish.yml) and select a revision to see each configuration's result. The [workflow](.github/workflows/publish.yml) builds four native addons and packs them into **one tarball**. Every runtime job uses that artifact; a distribution-specific rebuild cannot hide an incompatible release binary.
+Open [public Platform CI runs](https://github.com/kyeshmz/steamworks-rs-ts/actions/workflows/publish.yml) and select a revision to see the results by CPU architecture. The [workflow](.github/workflows/publish.yml) builds **five native addons** and packs them into one tarball. The Node and Electron jobs install that tarball as `steamworks.js` and check the process architecture before loading it.
 
-| Runtime | Architecture | Checks against the tarball |
+| Operating system | Native CPU / process | Additional execution mode |
 |---|---|---|
-| Windows Server 2022 and 2025 | x64 | Node 22, 24, 26; pinned Electron main process on each OS |
-| macOS 15 and 26 | Intel x64 and Apple Silicon arm64, natively | Node 22, 24, 26; pinned Electron on each OS and architecture |
-| Ubuntu 22.04, 24.04 and 26.04 | x64 | Node 22, 24, 26; pinned Electron under Xvfb on each OS |
-| Debian 12 and 13, Fedora 44, Rocky Linux 9, Arch Linux (rolling) | x64 | Node 22, 24, 26 in each distro's glibc userspace; native loading and API checks |
+| GNU/Linux | x86-64 and ARM64 (AArch64), each on its own runner | — |
+| macOS | Intel x86-64 and Apple Silicon ARM64 | x64 Node and Electron on Apple Silicon using Rosetta |
+| Windows | x86-64 | x64 Node and Electron on Windows 11 ARM using Windows emulation |
 
-`Platform compatibility` passes only when every runtime row passes. Pull requests and pushes to `main` or `ci/**` run the checks; release publishing on `main` is gated on the result. Native-host jobs install the tarball as `steamworks.js` and typecheck a consumer. Linux and macOS also exercise offline SDK fixtures. Container results cover distro libraries, not desktop integration or distro-specific kernels.
+Each of the seven execution modes has Node 22, 24 and 26 jobs and one check with the pinned Electron main process. Linux x64 and ARM64 also run the native SDK fixtures. One Linux runner image per CPU is sufficient for this matrix.
 
-The package ships a GNU/Linux x64 binary, not a musl/Alpine or Linux ARM build. These checks do not sign in to Steam or verify visible overlay rendering, real relay traffic, or Steam Deck hardware.
+**Windows on ARM requires an x64 process.** The pinned Steam SDK has no Windows ARM64 DLL. Separate Node 22 jobs verify that native Windows ARM64 and 32-bit x86 processes get an explicit unsupported-architecture error. Those are rejection tests, not support claims. There is no 32-bit ARM build.
+
+The `Platform compatibility` gate requires all runtime and rejection tests to pass. Pull requests and pushes to `main` or `ci/**` trigger the checks. Live Steam login, overlay rendering and Steam Deck hardware are outside the scope of these jobs.
 
 ## Releases
 

@@ -2,7 +2,9 @@ const assert = require('node:assert/strict')
 const { Worker } = require('node:worker_threads')
 const sdk = require(process.argv[2])
 
-const native = require(`${process.argv[2]}/dist/linux64/steamworksjs.linux-x64-gnu.node`)
+const platform = process.arch === 'arm64' ? 'linuxarm64' : 'linux64'
+const nativePath = `${process.argv[2]}/dist/${platform}/steamworksjs.linux-${process.arch}-gnu.node`
+const native = require(nativePath)
 const browser = native.matchmaking_servers
 assert.throws(() => new browser.ServerList(), /constructor/)
 for (const id of [0, -1, 1.5, Infinity, 2 ** 32]) {
@@ -67,7 +69,7 @@ async function finish() {
         parentPort.postMessage('ready')
         for (let i = 0; i < 150; i++) native.runCallbacks()
         parentPort.postMessage('done')
-    `, { eval: true, workerData: `${process.argv[2]}/dist/linux64/steamworksjs.linux-x64-gnu.node` })
+    `, { eval: true, workerData: nativePath })
     await new Promise((resolve, reject) => {
         worker.once('error', reject)
         worker.once('message', resolve)

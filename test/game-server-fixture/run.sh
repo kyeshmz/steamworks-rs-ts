@@ -12,10 +12,14 @@ Darwin)
     otool -L "$addon" | grep -q '@loader_path/libsteam_api.dylib'
     ;;
 Linux)
-    test "$(node -p process.arch)" = x64
-    dist=$root/dist/linux64
+    case "$(uname -m):$(node -p process.arch)" in
+        x86_64:x64) platform=linux64; arch=x64 ;;
+        aarch64:arm64) platform=linuxarm64; arch=arm64 ;;
+        *) echo "Requires native Linux x64 or arm64" >&2; exit 1 ;;
+    esac
+    dist=$root/dist/$platform
     mkdir -p "$dist"
-    addon="$dist/steamworksjs.linux-x64-gnu.node"
+    addon="$dist/steamworksjs.linux-$arch-gnu.node"
     cp "${1:-target/debug/libsteamworksjs.so}" "$addon"
     ;;
 *) echo "Unsupported fixture platform" >&2; exit 1 ;;

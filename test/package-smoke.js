@@ -10,6 +10,7 @@ async function verify(root) {
     const { platform, arch } = process
     const target = {
         'linux-x64': 'linux64/steamworksjs.linux-x64-gnu.node',
+        'linux-arm64': 'linuxarm64/steamworksjs.linux-arm64-gnu.node',
         'win32-x64': 'win64/steamworksjs.win32-x64-msvc.node',
         'darwin-arm64': 'osx/steamworksjs.darwin-arm64.node',
         'darwin-x64': 'osx/steamworksjs.darwin-x64.node',

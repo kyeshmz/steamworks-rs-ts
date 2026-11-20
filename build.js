@@ -15,6 +15,12 @@ const targets = {
         platform: 'linux',
         arch: 'x64'
     },
+    ['aarch64-unknown-linux-gnu']: {
+        folder: 'linuxarm64',
+        files: ['libsteam_api.so'],
+        platform: 'linux',
+        arch: 'arm64'
+    },
     ['x86_64-apple-darwin']: {
         folder: 'osx',
         files: ['libsteam_api.dylib'],
