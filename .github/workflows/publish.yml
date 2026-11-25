@@ -19,7 +19,7 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
             - name: Setup Rust
               uses: dtolnay/rust-toolchain@stable
@@ -50,7 +50,7 @@ jobs:
 
         steps:
             - run: apt-get update && apt-get install -y ca-certificates curl git build-essential
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
             - name: Setup Node.js
               uses: actions/setup-node@v7
@@ -106,7 +106,7 @@ jobs:
         name: Build Windows x64 (MSVC)
         runs-on: windows-2022
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
             - uses: pnpm/action-setup@v6
             - uses: actions/setup-node@v7
               with:
@@ -132,7 +132,7 @@ jobs:
         runs-on: ${{ matrix.os }}
 
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
             - uses: pnpm/action-setup@v6
 
             - name: Setup Node
@@ -168,7 +168,7 @@ jobs:
         runs-on: ubuntu-latest
         needs: [check, build, build-windows, build-mac]
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
             - uses: pnpm/action-setup@v6
             - uses: actions/setup-node@v7
               with:
@@ -240,7 +240,7 @@ jobs:
         env:
             npm_config_arch: ${{ matrix.cpu.arch }}
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
             - uses: pnpm/action-setup@v6
             - uses: actions/setup-node@v7
               with:
