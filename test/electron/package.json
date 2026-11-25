@@ -5,7 +5,7 @@
         "@kyeshmz/steamworks.ts": "workspace:*"
     },
     "devDependencies": {
-        "electron": "45.3.2",
+        "electron": "45.4.1",
         "electron-packager": "17.1.2"
     },
     "main": "main.js",
